@@ -1,6 +1,6 @@
 use std::{ffi::c_char, sync::LazyLock};
 
-use ash::{vk, Device};
+use ash::{vk, Device, Entry, Instance};
 
 use crate::{
     features::{vk_features, VkFeatureGuard, VkFeatures},
@@ -14,7 +14,7 @@ pub struct RasterRenderer {}
 impl Renderer<(), WindowData> for RasterRenderer {
     type Error = anyhow::Error;
 
-    fn new(device: &Device, queue_info: QueueInfo) -> Self {
+    fn new(vk_lib: &Entry, instance: &Instance, device: &Device, queue_info: QueueInfo) -> Self {
         RasterRenderer {}
     }
 

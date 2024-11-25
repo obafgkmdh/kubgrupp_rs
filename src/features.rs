@@ -231,8 +231,6 @@ impl<'a> Drop for VkFeatureGuard<'a> {
 
 #[cfg(test)]
 mod tests {
-    use ash::vk;
-
     #[test]
     fn test_vkfeatures() {
         let features = vk_features! {

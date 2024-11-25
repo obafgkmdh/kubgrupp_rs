@@ -1,5 +1,3 @@
-use std::ptr;
-
 use anyhow::Result;
 use ash::{khr, vk, Entry, Instance};
 

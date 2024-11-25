@@ -1,4 +1,4 @@
-use std::ffi::{c_char, c_void, CStr, CString};
+use std::ffi::{c_char, c_void, CStr};
 use std::ptr;
 
 use anyhow::Result;
@@ -25,7 +25,7 @@ use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
-use winit::window::{Window, WindowAttributes, WindowId};
+use winit::window::{WindowAttributes, WindowId};
 
 mod debug;
 mod defer;
@@ -362,7 +362,7 @@ where
 
             self.physical_device = Some(physical_device);
             self.device = Some(device.clone());
-            self.renderer = Some(R::new(&device, queue_info));
+            self.renderer = Some(R::new(&self.vk_lib, &self.instance, &device, queue_info));
 
             // this is where we load the initial scene into the renderer
             // future updates come through the event loop through the render function

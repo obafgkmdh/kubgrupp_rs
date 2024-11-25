@@ -5,7 +5,7 @@ use crate::{
     scene::Scene,
     utils::{QueueFamilyInfo, QueueInfo},
 };
-use ash::{vk, Device};
+use ash::{Device, Entry, Instance};
 
 pub mod renderers;
 
@@ -17,7 +17,7 @@ where
 {
     type Error;
 
-    fn new(device: &Device, queue_info: QueueInfo) -> Self;
+    fn new(vk_lib: &Entry, instance: &Instance, device: &Device, queue_info: QueueInfo) -> Self;
 
     fn ingest_scene(&mut self, scene: &S);
     fn render_to(&mut self, updates: S::Updates, target: &mut Target) -> Result<(), Self::Error>;
