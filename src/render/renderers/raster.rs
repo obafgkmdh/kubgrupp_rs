@@ -1,0 +1,64 @@
+use std::{ffi::c_char, sync::LazyLock};
+
+use ash::{vk, Device};
+
+use crate::{
+    features::{vk_features, VkFeatureGuard, VkFeatures},
+    render::Renderer,
+    utils::{QueueFamilyInfo, QueueInfo},
+    window::WindowData,
+};
+
+pub struct RasterRenderer {}
+
+impl Renderer<(), WindowData> for RasterRenderer {
+    type Error = anyhow::Error;
+
+    fn new(device: &Device, queue_info: QueueInfo) -> Self {
+        RasterRenderer {}
+    }
+
+    fn ingest_scene(&mut self, _scene: &()) {}
+
+    fn render_to(&mut self, _updates: (), target: &mut WindowData) -> Result<(), Self::Error> {
+        todo!()
+    }
+
+    fn required_instance_extensions() -> &'static [*const c_char] {
+        &[]
+    }
+
+    fn required_device_extensions() -> &'static [*const c_char] {
+        &[]
+    }
+
+    fn required_features() -> VkFeatureGuard<'static> {
+        // why is default not const 😭
+        static FEATURES: LazyLock<VkFeatures> = LazyLock::new(|| {
+            vk_features! {
+                vk::PhysicalDeviceFeatures {}
+            }
+        });
+
+        // this does allocation and could theoretically be optimized by putting in a const
+        // but uh who cares lol
+        FEATURES.get_list()
+    }
+
+    fn has_required_queue_families(queue_family_info: &QueueFamilyInfo) -> bool {
+        queue_family_info.graphics_index.is_some() && queue_family_info.present_index.is_some()
+    }
+
+    fn get_queue_info(queue_family_info: &QueueFamilyInfo) -> QueueInfo {
+        let create_info = vk::DeviceQueueCreateInfo {
+            queue_family_index: queue_family_info.graphics_index.unwrap(),
+            queue_count: 1,
+            p_queue_priorities: &1.0,
+            ..Default::default()
+        };
+
+        QueueInfo {
+            infos: vec![create_info],
+        }
+    }
+}
