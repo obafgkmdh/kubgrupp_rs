@@ -6,6 +6,18 @@ enum Token<'a> {
     Integer(usize),
 }
 
-pub struct TokenIter {
-
+pub struct TokenIter<'a> {
+    remaining: &'a str
 }
+
+impl<'a> TokenIter<'a> {
+    pub fn new(str: &'a str) -> Self {
+        Self {
+            remaining: str
+        }
+    }
+}
+
+//impl Iterator for TokenIter {
+//
+//}
