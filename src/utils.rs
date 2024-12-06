@@ -85,7 +85,7 @@ pub struct AllocatedBuffer {
 impl AllocatedBuffer {
     pub fn new(
         device: &Device,
-        allocator: Rc<RefCell<Allocator>>,
+        allocator: &mut Allocator,
         size: vk::DeviceSize,
         usage: vk::BufferUsageFlags,
         location: MemoryLocation,
@@ -103,7 +103,7 @@ impl AllocatedBuffer {
 
             let memory_req = device.get_buffer_memory_requirements(buffer);
 
-            let allocation = allocator.borrow_mut().allocate(&AllocationCreateDesc {
+            let allocation = allocator.allocate(&AllocationCreateDesc {
                 name: "buffer",
                 requirements: memory_req,
                 location,
@@ -146,8 +146,8 @@ impl AllocatedBuffer {
         device.get_buffer_device_address(&buffer_device_address_info)
     }
 
-    pub unsafe fn destroy(self, device: &Device, allocator: Rc<RefCell<Allocator>>) {
+    pub unsafe fn destroy(self, device: &Device, allocator: &mut Allocator) {
         device.destroy_buffer(self.buffer, None);
-        allocator.borrow_mut().free(self.allocation);
+        allocator.free(self.allocation);
     }
 }

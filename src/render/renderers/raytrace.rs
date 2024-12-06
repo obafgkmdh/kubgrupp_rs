@@ -1,4 +1,4 @@
-use std::{cell::RefCell, ffi::c_char, rc::Rc, sync::LazyLock};
+use std::{ffi::c_char, sync::LazyLock};
 
 use anyhow::anyhow;
 use ash::{khr, vk, Device, Entry, Instance};
@@ -21,7 +21,6 @@ pub struct RaytraceRenderer {
     instance: Instance,
     physical_device: vk::PhysicalDevice,
     device: Device,
-    allocator: Rc<RefCell<Allocator>>,
     device_properties: vk::PhysicalDeviceProperties,
     command_pool: vk::CommandPool,
     compute_queue: vk::Queue,
@@ -37,6 +36,7 @@ impl RaytraceRenderer {
         ty: vk::AccelerationStructureTypeKHR,
         geometries: &[vk::AccelerationStructureGeometryKHR],
         primitive_counts: &[u32],
+        allocator: &mut Allocator,
     ) -> anyhow::Result<(Vec<vk::AccelerationStructureKHR>, Vec<AllocatedBuffer>)> {
         let mut build_infos = Vec::new();
         let mut build_range_infos = Vec::new();
@@ -74,7 +74,7 @@ impl RaytraceRenderer {
 
             let buffer = AllocatedBuffer::new(
                 &self.device,
-                self.allocator.clone(),
+                allocator,
                 size_info.acceleration_structure_size,
                 vk::BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR
                     | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
@@ -97,7 +97,7 @@ impl RaytraceRenderer {
 
             let scratch_buffer = AllocatedBuffer::new(
                 &self.device,
-                self.allocator.clone(),
+                allocator,
                 size_info.build_scratch_size,
                 vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS | vk::BufferUsageFlags::STORAGE_BUFFER,
                 MemoryLocation::GpuOnly,
@@ -163,7 +163,7 @@ impl RaytraceRenderer {
                 .free_command_buffers(self.command_pool, &[build_command_buffer]);
 
             for scratch_buffer in scratch_buffers {
-                scratch_buffer.destroy(&self.device, self.allocator.clone());
+                scratch_buffer.destroy(&self.device, allocator);
             }
         }
 
@@ -173,6 +173,7 @@ impl RaytraceRenderer {
     fn get_mesh_geometries(
         &self,
         meshes: &[Obj],
+        allocator: &mut Allocator,
     ) -> anyhow::Result<(
         Vec<vk::AccelerationStructureGeometryKHR>,
         Vec<(AllocatedBuffer, AllocatedBuffer)>,
@@ -187,7 +188,7 @@ impl RaytraceRenderer {
 
             let mut vertex_buffer = AllocatedBuffer::new(
                 &self.device,
-                self.allocator.clone(),
+                allocator,
                 (vertex_stride * vertex_count) as vk::DeviceSize,
                 vk::BufferUsageFlags::VERTEX_BUFFER
                     | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
@@ -202,7 +203,7 @@ impl RaytraceRenderer {
 
             let mut index_buffer = AllocatedBuffer::new(
                 &self.device,
-                self.allocator.clone(),
+                allocator,
                 (index_stride * index_count) as vk::DeviceSize,
                 vk::BufferUsageFlags::INDEX_BUFFER
                     | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
@@ -248,6 +249,7 @@ impl RaytraceRenderer {
         acceleration_structure: &khr::acceleration_structure::Device,
         objects: &[mesh::Instance],
         bottom_accel_structs: &[vk::AccelerationStructureKHR],
+        allocator: &mut Allocator,
     ) -> anyhow::Result<(vk::AccelerationStructureGeometryKHR, AllocatedBuffer, u32)> {
         let mut accel_handles = Vec::new();
         for bottom_accel_struct in bottom_accel_structs {
@@ -292,7 +294,7 @@ impl RaytraceRenderer {
         let instance_buffer_size = std::mem::size_of_val(&instances[0]) * instances.len();
         let mut instance_buffer = AllocatedBuffer::new(
             &self.device,
-            self.allocator.clone(),
+            allocator,
             instance_buffer_size as vk::DeviceSize,
             vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
                 | vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
@@ -327,15 +329,6 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
         physical_device: vk::PhysicalDevice,
         queue_family_info: &QueueFamilyInfo,
     ) -> anyhow::Result<Self> {
-        let allocator = Allocator::new(&AllocatorCreateDesc {
-            instance: instance.clone(),
-            device: device.clone(),
-            physical_device,
-            debug_settings: Default::default(),
-            buffer_device_address: true,
-            allocation_sizes: Default::default(),
-        })?;
-
         let device_properties = unsafe { instance.get_physical_device_properties(physical_device) };
 
         let compute_queue_index = queue_family_info
@@ -357,7 +350,6 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
                 instance: instance.clone(),
                 physical_device: physical_device.clone(),
                 device: device.clone(),
-                allocator: Rc::new(RefCell::new(allocator)),
                 device_properties,
                 command_pool,
                 compute_queue,
@@ -368,24 +360,26 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
         }
     }
 
-    fn ingest_scene(&mut self, scene: &MeshScene) -> anyhow::Result<()> {
+    fn ingest_scene(&mut self, scene: &MeshScene, allocator: &mut Allocator) -> anyhow::Result<()> {
         let acceleration_structure =
             khr::acceleration_structure::Device::new(&self.instance, &self.device);
 
         let (mesh_geometries, mesh_buffers, mesh_primitive_counts) =
-            self.get_mesh_geometries(&scene.meshes)?;
+            self.get_mesh_geometries(&scene.meshes, allocator)?;
 
         let (bottom_accel_structs, bottom_as_buffers) = self.build_accel_structs(
             &acceleration_structure,
             vk::AccelerationStructureTypeKHR::BOTTOM_LEVEL,
             &mesh_geometries,
             &mesh_primitive_counts,
+            allocator
         )?;
 
         let (instance_geometry, instance_buffer, instance_count) = self.get_instance_geometry(
             &acceleration_structure,
             &scene.instances,
             &bottom_accel_structs,
+            allocator
         )?;
 
         let (top_as, top_as_buffer) = self.build_accel_structs(
@@ -393,6 +387,7 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             vk::AccelerationStructureTypeKHR::TOP_LEVEL,
             &[instance_geometry],
             &[instance_count],
+            allocator
         )?;
 
         let descriptor_set_layout = {

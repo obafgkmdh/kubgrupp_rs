@@ -16,6 +16,7 @@ use ash::{
 use debug::DebugUtilsData;
 use defer::Defer;
 use env_logger::Builder;
+use gpu_allocator::vulkan::{Allocator, AllocatorCreateDesc};
 use log::{debug, warn, LevelFilter};
 use render::renderers::RaytraceRenderer;
 use render::Renderer;
@@ -53,6 +54,7 @@ struct App<S, R> {
     // make sure to also update the Drop impl when adding fields
     renderer: Option<R>,
     window: Option<WindowData>,
+    allocator: Option<Allocator>,
     debug_data: Option<DebugUtilsData>,
     physical_device: Option<vk::PhysicalDevice>,
     device: Option<Device>,
@@ -100,6 +102,7 @@ where
         Ok(App {
             renderer: None,
             window: None,
+            allocator: None,
             debug_data,
             device: None,
             physical_device: None,
@@ -349,6 +352,18 @@ where
                 .create_device(physical_device, &queue_family_info)
                 .expect("failed to create device");
 
+            self.allocator = Some(
+                Allocator::new(&AllocatorCreateDesc {
+                    instance: self.instance.clone(),
+                    device: device.clone(),
+                    physical_device,
+                    debug_settings: Default::default(),
+                    buffer_device_address: true,
+                    allocation_sizes: Default::default(),
+                })
+                .expect("failed to create allocator"),
+            );
+
             self.window = Some(
                 WindowData::new(
                     &self.vk_lib,
@@ -380,7 +395,7 @@ where
             self.renderer
                 .as_mut()
                 .unwrap()
-                .ingest_scene(&self.scene)
+                .ingest_scene(&self.scene, self.allocator.as_mut().unwrap())
                 .expect("failed to ingest scene");
         }
     }
@@ -411,6 +426,7 @@ fn main() {
 
     let file = File::open("resources/scenes/cubes.toml").expect("scene file does not exist");
     let scene = MeshScene::load_from(file).expect("scene could not be loaded");
-    let mut app: App<MeshScene, RaytraceRenderer> = App::new(&event_loop, scene, DEBUG_MODE).unwrap();
+    let mut app: App<MeshScene, RaytraceRenderer> =
+        App::new(&event_loop, scene, DEBUG_MODE).unwrap();
     event_loop.run_app(&mut app).unwrap();
 }

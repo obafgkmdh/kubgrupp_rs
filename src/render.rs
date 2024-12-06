@@ -6,6 +6,7 @@ use crate::{
     utils::{QueueFamilyInfo, QueueInfo},
 };
 use ash::{vk, Device, Entry, Instance};
+use gpu_allocator::vulkan::Allocator;
 
 pub mod renderers;
 
@@ -24,7 +25,7 @@ where
         queue_family_info: &QueueFamilyInfo,
     ) -> anyhow::Result<Self>;
 
-    fn ingest_scene(&mut self, scene: &S) -> anyhow::Result<()>;
+    fn ingest_scene(&mut self, scene: &S, allocator: &mut Allocator) -> anyhow::Result<()>;
     fn render_to(&mut self, updates: &S::Updates, target: &mut Target) -> anyhow::Result<()>;
 
     fn required_instance_extensions() -> &'static [*const c_char];
