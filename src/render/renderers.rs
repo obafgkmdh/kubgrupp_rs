@@ -1,4 +1,3 @@
-mod raster;
 mod raytrace;
 
-pub use raster::RasterRenderer;
+pub use raytrace::RaytraceRenderer;

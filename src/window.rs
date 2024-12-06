@@ -75,15 +75,15 @@ impl WindowData {
         let queue_info = utils::query_queue_families(vk_lib, instance, physical_device, surface)?;
         let queue_indices = [
             queue_info
-                .graphics_index
-                .ok_or(anyhow!("no graphics index found"))?,
+                .compute_index
+                .ok_or(anyhow!("no compute index found"))?,
             queue_info
                 .present_index
                 .ok_or(anyhow!("no present index found"))?,
         ];
 
         let (image_sharing_mode, queue_family_count, queue_family_indices) =
-            if queue_info.graphics_index.unwrap() == queue_info.present_index.unwrap() {
+            if queue_info.compute_index.unwrap() == queue_info.present_index.unwrap() {
                 (vk::SharingMode::EXCLUSIVE, 0, ptr::null())
             } else {
                 (vk::SharingMode::CONCURRENT, 2, queue_indices.as_ptr())

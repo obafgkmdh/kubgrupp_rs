@@ -1,5 +1,5 @@
 use anyhow::Result;
-use ash::{khr, vk, Entry, Instance};
+use ash::{khr, util::Align, vk, Device, Entry, Instance};
 
 // it is fine to make DeviceQueueCreateInfo lifetime static because we are not using any of the p_next stuff
 // if we need to use those, then this kinda becomes a problem lul
@@ -40,7 +40,7 @@ pub fn query_queue_families(
             info.compute_index = Some(i as u32);
         }
         if info.transfer_index.is_none() && family.queue_flags.contains(vk::QueueFlags::TRANSFER) {
-            info.compute_index = Some(i as u32);
+            info.transfer_index = Some(i as u32);
         }
 
         let present_support = unsafe {
@@ -52,4 +52,113 @@ pub fn query_queue_families(
     }
 
     Ok(info)
+}
+
+pub fn get_memory_type_index(
+    device_memory_properties: vk::PhysicalDeviceMemoryProperties,
+    mut type_bits: u32,
+    properties: vk::MemoryPropertyFlags,
+) -> u32 {
+    for i in 0..device_memory_properties.memory_type_count {
+        if (type_bits & 1) == 1
+            && (device_memory_properties.memory_types[i as usize].property_flags & properties)
+                == properties
+        {
+            return i;
+        }
+        type_bits >>= 1;
+    }
+    0
+}
+
+pub struct AllocatedBuffer {
+    pub buffer: vk::Buffer,
+    memory: vk::DeviceMemory,
+    size: vk::DeviceSize,
+}
+
+impl AllocatedBuffer {
+    pub fn new(
+        device: &Device,
+        size: vk::DeviceSize,
+        usage: vk::BufferUsageFlags,
+        memory_properties: vk::MemoryPropertyFlags,
+        device_memory_properties: vk::PhysicalDeviceMemoryProperties,
+    ) -> Result<AllocatedBuffer> {
+        unsafe {
+            let buffer_info = vk::BufferCreateInfo {
+                size,
+                usage,
+                sharing_mode: vk::SharingMode::EXCLUSIVE,
+                ..Default::default()
+            };
+
+            let buffer = device.create_buffer(&buffer_info, None)?;
+
+            let memory_req = device.get_buffer_memory_requirements(buffer);
+            let memory_index = get_memory_type_index(
+                device_memory_properties,
+                memory_req.memory_type_bits,
+                memory_properties,
+            );
+
+            let mut memory_allocate_flags_info = vk::MemoryAllocateFlagsInfo {
+                flags: vk::MemoryAllocateFlags::DEVICE_ADDRESS,
+                ..Default::default()
+            };
+            let mut allocate_info = vk::MemoryAllocateInfo {
+                allocation_size: memory_req.size,
+                memory_type_index: memory_index,
+                ..Default::default()
+            };
+
+            if usage.contains(vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS) {
+                allocate_info = allocate_info.push_next(&mut memory_allocate_flags_info);
+            }
+
+            let memory = device.allocate_memory(&allocate_info, None)?;
+            device.bind_buffer_memory(buffer, memory, 0)?;
+
+            Ok(AllocatedBuffer {
+                buffer,
+                memory,
+                size,
+            })
+        }
+    }
+
+    pub fn store<T: Copy>(&mut self, device: &Device, data: &[T]) -> Result<()> {
+        unsafe {
+            let size = std::mem::size_of_val(data) as u64;
+            assert!(self.size >= size, "Data size is larger than buffer size.");
+            let mapped_ptr = self.map(device, size)?;
+            let mut mapped_slice = Align::new(mapped_ptr, std::mem::align_of::<T>() as u64, size);
+            mapped_slice.copy_from_slice(data);
+            self.unmap(device);
+        }
+        Ok(())
+    }
+
+    pub fn map(&mut self, device: &Device, size: vk::DeviceSize) -> Result<*mut std::ffi::c_void> {
+        unsafe { Ok(device.map_memory(self.memory, 0, size, vk::MemoryMapFlags::empty())?) }
+    }
+
+    pub fn unmap(&mut self, device: &Device) {
+        unsafe {
+            device.unmap_memory(self.memory);
+        }
+    }
+
+    pub unsafe fn get_device_address(&self, device: &Device) -> u64 {
+        let buffer_device_address_info = vk::BufferDeviceAddressInfo {
+            buffer: self.buffer,
+            ..Default::default()
+        };
+        device.get_buffer_device_address(&buffer_device_address_info)
+    }
+
+    pub unsafe fn destroy(self, device: &Device) {
+        device.destroy_buffer(self.buffer, None);
+        device.free_memory(self.memory, None);
+    }
 }

@@ -5,7 +5,7 @@ use crate::{
     scene::Scene,
     utils::{QueueFamilyInfo, QueueInfo},
 };
-use ash::{Device, Entry, Instance};
+use ash::{vk, Device, Entry, Instance};
 
 pub mod renderers;
 
@@ -14,13 +14,18 @@ pub mod renderers;
 pub trait Renderer<S, Target>
 where
     S: Scene,
+    Self: Sized,
 {
-    type Error;
+    fn new(
+        vk_lib: &Entry,
+        instance: &Instance,
+        device: &Device,
+        physical_device: vk::PhysicalDevice,
+        queue_family_info: &QueueFamilyInfo,
+    ) -> anyhow::Result<Self>;
 
-    fn new(vk_lib: &Entry, instance: &Instance, device: &Device, queue_info: QueueInfo) -> Self;
-
-    fn ingest_scene(&mut self, scene: &S);
-    fn render_to(&mut self, updates: S::Updates, target: &mut Target) -> Result<(), Self::Error>;
+    fn ingest_scene(&mut self, scene: &S) -> anyhow::Result<()>;
+    fn render_to(&mut self, updates: &S::Updates, target: &mut Target) -> anyhow::Result<()>;
 
     fn required_instance_extensions() -> &'static [*const c_char];
     fn required_device_extensions() -> &'static [*const c_char];

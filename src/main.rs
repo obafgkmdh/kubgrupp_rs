@@ -16,10 +16,10 @@ use debug::DebugUtilsData;
 use defer::Defer;
 use env_logger::Builder;
 use log::{debug, warn, LevelFilter};
-use render::renderers::RasterRenderer;
+use render::renderers::RaytraceRenderer;
 use render::Renderer;
 use scene::Scene;
-use utils::{query_queue_families, QueueFamilyInfo, QueueInfo};
+use utils::{query_queue_families, QueueFamilyInfo};
 use window::WindowData;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
@@ -250,7 +250,7 @@ where
         &self,
         physical_device: vk::PhysicalDevice,
         queue_family_info: &QueueFamilyInfo,
-    ) -> Result<(Device, QueueInfo)> {
+    ) -> Result<Device> {
         let enabled_extensions = [
             R::required_device_extensions(),
             WindowData::required_device_extensions(),
@@ -274,7 +274,7 @@ where
                 .create_device(physical_device, &create_info, None)
         }?;
 
-        Ok((device, queue_info))
+        Ok(device)
     }
 }
 
@@ -343,7 +343,7 @@ where
             let queue_family_info =
                 query_queue_families(&self.vk_lib, &self.instance, physical_device, *surface)
                     .expect("failed to find queue family info");
-            let (device, queue_info) = self
+            let device = self
                 .create_device(physical_device, &queue_family_info)
                 .expect("failed to create device");
 
@@ -362,11 +362,24 @@ where
 
             self.physical_device = Some(physical_device);
             self.device = Some(device.clone());
-            self.renderer = Some(R::new(&self.vk_lib, &self.instance, &device, queue_info));
+            self.renderer = Some(
+                R::new(
+                    &self.vk_lib,
+                    &self.instance,
+                    &device,
+                    physical_device,
+                    &queue_family_info,
+                )
+                .expect("failed to create renderer"),
+            );
 
             // this is where we load the initial scene into the renderer
             // future updates come through the event loop through the render function
-            self.renderer.as_mut().unwrap().ingest_scene(&self.scene);
+            self.renderer
+                .as_mut()
+                .unwrap()
+                .ingest_scene(&self.scene)
+                .expect("failed to ingest scene");
         }
     }
 
@@ -393,6 +406,6 @@ fn main() {
         .init();
 
     let event_loop = EventLoop::new().unwrap();
-    let mut app: App<(), RasterRenderer> = App::new(&event_loop, (), DEBUG_MODE).unwrap();
+    let mut app: App<(), RaytraceRenderer> = App::new(&event_loop, (), DEBUG_MODE).unwrap();
     event_loop.run_app(&mut app).unwrap();
 }
