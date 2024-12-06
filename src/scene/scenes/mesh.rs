@@ -11,6 +11,8 @@ use obj::Obj;
 use serde::Deserialize;
 use toml::{Table, Value};
 
+use crate::scene::Scene;
+
 #[derive(Clone)]
 pub struct MeshScene {
     pub camera_mat: Mat4,
@@ -63,6 +65,16 @@ pub struct Instance {
     pub brdf_i: usize,
     pub brdf_params: Vec<u8>,
     pub alignment: usize,
+}
+
+pub enum MeshSceneUpdate {
+    NewView(Mat4),
+    NewAspectRatio(f32),
+    NewFovDegrees(f32),
+}
+
+impl Scene for MeshScene {
+    type Updates = [MeshSceneUpdate];
 }
 
 impl MeshScene {
@@ -131,8 +143,6 @@ impl MeshScene {
 
                     let scale = Mat4::from_scale(scale);
                     transform = scale * transform;
-
-                    fn lex_type() -> Self {}
                 }
                 "lookat" => {
                     let eye_x = Self::parse_f32(&mut tokens)?;
