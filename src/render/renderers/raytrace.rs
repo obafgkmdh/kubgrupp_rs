@@ -267,16 +267,10 @@ impl RaytraceRenderer {
         let mut instances = Vec::new();
         for (i, object) in objects.iter().enumerate() {
             let mut matrix = [0f32; 16];
-            object.transform.write_cols_to_slice(&mut matrix);
+            object.transform.transpose().write_cols_to_slice(&mut matrix);
 
             let mut matrix_3_4 = [0f32; 12];
-            let mut idx = 0;
-            for (i, &val) in matrix.iter().enumerate() {
-                if i % 4 != 3 {
-                    matrix_3_4[idx] = val;
-                    idx += 1;
-                }
-            }
+            matrix_3_4.copy_from_slice(&matrix[0..12]);
 
             instances.push(vk::AccelerationStructureInstanceKHR {
                 transform: vk::TransformMatrixKHR { matrix: matrix_3_4 },
@@ -398,7 +392,7 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
                     | vk::DescriptorBindingFlags::PARTIALLY_BOUND,
             ];
 
-            let mut binding_flags = vk::DescriptorSetLayoutBindingFlagsCreateInfo {
+            let binding_flags = vk::DescriptorSetLayoutBindingFlagsCreateInfo {
                 binding_count: binding_flags_inner.len() as u32,
                 p_binding_flags: binding_flags_inner.as_ptr(),
                 ..Default::default()
