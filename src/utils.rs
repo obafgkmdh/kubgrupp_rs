@@ -1,5 +1,10 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use anyhow::Result;
-use ash::{khr, util::Align, vk, Device, Entry, Instance};
+use ash::{khr, vk, Device, Entry, Instance};
+use gpu_allocator::vulkan::*;
+use gpu_allocator::MemoryLocation;
 
 // it is fine to make DeviceQueueCreateInfo lifetime static because we are not using any of the p_next stuff
 // if we need to use those, then this kinda becomes a problem lul
@@ -73,17 +78,18 @@ pub fn get_memory_type_index(
 
 pub struct AllocatedBuffer {
     pub buffer: vk::Buffer,
-    memory: vk::DeviceMemory,
-    size: vk::DeviceSize,
+    allocation: Allocation,
+    offset_alignment: usize,
 }
 
 impl AllocatedBuffer {
     pub fn new(
         device: &Device,
+        allocator: Rc<RefCell<Allocator>>,
         size: vk::DeviceSize,
         usage: vk::BufferUsageFlags,
-        memory_properties: vk::MemoryPropertyFlags,
-        device_memory_properties: vk::PhysicalDeviceMemoryProperties,
+        location: MemoryLocation,
+        limits: vk::PhysicalDeviceLimits,
     ) -> Result<AllocatedBuffer> {
         unsafe {
             let buffer_info = vk::BufferCreateInfo {
@@ -96,57 +102,40 @@ impl AllocatedBuffer {
             let buffer = device.create_buffer(&buffer_info, None)?;
 
             let memory_req = device.get_buffer_memory_requirements(buffer);
-            let memory_index = get_memory_type_index(
-                device_memory_properties,
-                memory_req.memory_type_bits,
-                memory_properties,
-            );
 
-            let mut memory_allocate_flags_info = vk::MemoryAllocateFlagsInfo {
-                flags: vk::MemoryAllocateFlags::DEVICE_ADDRESS,
-                ..Default::default()
-            };
-            let mut allocate_info = vk::MemoryAllocateInfo {
-                allocation_size: memory_req.size,
-                memory_type_index: memory_index,
-                ..Default::default()
-            };
+            let allocation = allocator.borrow_mut().allocate(&AllocationCreateDesc {
+                name: "buffer",
+                requirements: memory_req,
+                location,
+                linear: true,
+                allocation_scheme: AllocationScheme::GpuAllocatorManaged,
+            })?;
 
-            if usage.contains(vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS) {
-                allocate_info = allocate_info.push_next(&mut memory_allocate_flags_info);
+            device.bind_buffer_memory(buffer, allocation.memory(), allocation.offset())?;
+
+            let mut offset_alignment: usize = 1;
+            if usage.contains(vk::BufferUsageFlags::STORAGE_BUFFER) {
+                offset_alignment = limits.min_storage_buffer_offset_alignment as usize;
+            } else if usage.contains(vk::BufferUsageFlags::UNIFORM_BUFFER) {
+                offset_alignment = limits.min_uniform_buffer_offset_alignment as usize;
             }
-
-            let memory = device.allocate_memory(&allocate_info, None)?;
-            device.bind_buffer_memory(buffer, memory, 0)?;
 
             Ok(AllocatedBuffer {
                 buffer,
-                memory,
-                size,
+                allocation,
+                offset_alignment,
             })
         }
     }
 
-    pub fn store<T: Copy>(&mut self, device: &Device, data: &[T]) -> Result<()> {
-        unsafe {
-            let size = std::mem::size_of_val(data) as u64;
-            assert!(self.size >= size, "Data size is larger than buffer size.");
-            let mapped_ptr = self.map(device, size)?;
-            let mut mapped_slice = Align::new(mapped_ptr, std::mem::align_of::<T>() as u64, size);
-            mapped_slice.copy_from_slice(data);
-            self.unmap(device);
-        }
+    pub fn store<T: Copy>(&mut self, data: &[T]) -> Result<()> {
+        presser::copy_from_slice_to_offset_with_align(
+            data,
+            &mut self.allocation,
+            0,
+            self.offset_alignment,
+        )?;
         Ok(())
-    }
-
-    pub fn map(&mut self, device: &Device, size: vk::DeviceSize) -> Result<*mut std::ffi::c_void> {
-        unsafe { Ok(device.map_memory(self.memory, 0, size, vk::MemoryMapFlags::empty())?) }
-    }
-
-    pub fn unmap(&mut self, device: &Device) {
-        unsafe {
-            device.unmap_memory(self.memory);
-        }
     }
 
     pub unsafe fn get_device_address(&self, device: &Device) -> u64 {
@@ -157,8 +146,8 @@ impl AllocatedBuffer {
         device.get_buffer_device_address(&buffer_device_address_info)
     }
 
-    pub unsafe fn destroy(self, device: &Device) {
+    pub unsafe fn destroy(self, device: &Device, allocator: Rc<RefCell<Allocator>>) {
         device.destroy_buffer(self.buffer, None);
-        device.free_memory(self.memory, None);
+        allocator.borrow_mut().free(self.allocation);
     }
 }
