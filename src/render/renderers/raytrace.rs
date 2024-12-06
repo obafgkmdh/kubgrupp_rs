@@ -31,14 +31,9 @@ impl Renderer<(), WindowData> for RaytraceRenderer {
     }
 
     fn ingest_scene(&mut self, _scene: &()) {
-        let vertices = [
-            [-0.5, -0.5, 0.0],
-            [0.0, 0.5, 0.0],
-            [0.5, -0.5, 0.0],
-        ];
+        let vertices = [[-0.5, -0.5, 0.0], [0.0, 0.5, 0.0], [0.5, -0.5, 0.0]];
         let vertex_count = vertices.len();
         let vertex_stride = std::mem::size_of_val(&vertices[0]);
-
     }
 
     fn render_to(&mut self, _updates: (), target: &mut WindowData) -> Result<(), Self::Error> {
@@ -93,4 +88,3 @@ impl Renderer<(), WindowData> for RaytraceRenderer {
         }
     }
 }
-

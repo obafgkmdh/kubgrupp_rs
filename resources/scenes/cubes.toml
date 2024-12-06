@@ -1,0 +1,40 @@
+[global_shaders]
+miss = "black.miss"
+
+[camera]
+view = '''
+lookat 4 0 2   0 0 0    0 0 1
+'''
+fov = 70
+
+[[light]]
+type = "point"
+radiance = [.84, .76, .56]
+position = [-5, -5, 10]
+
+[[light]]
+type = "point"
+radiance = [.5, .5, .5]
+position = [5, 5, 10]
+
+[[brdf]]
+name = "flat"
+chit_shader = "diffuse.rchit"
+[[brdf.field]]
+name = "albedo"
+type = "[float; 3]"
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+identity
+'''
+brdf = {name = "flat", fields = [[.2, .8, .2]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 45 0 0 1
+translate 1 1 0
+'''
+brdf = {name = "flat", fields = [[.8, .2, .2]]}

@@ -6,7 +6,10 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.93"
 ash = "0.38.0"
-ash-window = "0.13.0"
 env_logger = "0.11.5"
+glam = "0.29.2"
 log = "0.4.22"
+obj-rs = "0.7.4"
+serde = { version = "1.0.215", features = ["derive"] }
+toml = { version = "0.8.19" }
 winit = "0.30.5"
