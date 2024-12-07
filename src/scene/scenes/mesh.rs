@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     f32::consts::PI,
-    io::{BufReader, Read},
+    io::{BufReader, Read}, iter::Peekable,
 };
 
 use anyhow::{anyhow, bail, Result};
@@ -11,7 +11,7 @@ use obj::Obj;
 use serde::Deserialize;
 use toml::{Table, Value};
 
-use crate::scene::Scene;
+use crate::scene::{type_lexer::{Token, TokenIter}, Scene};
 
 #[derive(Clone)]
 pub struct MeshScene {
@@ -65,6 +65,14 @@ pub struct Instance {
     pub brdf_i: usize,
     pub brdf_params: Vec<u8>,
     pub alignment: usize,
+}
+
+enum ShaderType {
+    Float,
+    Vec3,
+    UInt,
+    Int,
+    Array(Box<ShaderType>, u64),
 }
 
 pub enum MeshSceneUpdate {
@@ -121,7 +129,7 @@ impl MeshScene {
                         bail!("transform requires only x y z, but extra info was provided");
                     }
 
-                    let translation = Mat4::from_translation(Vec3::from_array([x, y, z]));
+                    let translation = Mat4::from_translation(Vec3::new(x, y, z));
                     transform = translation * transform;
                 }
                 "rotate" => {
@@ -129,7 +137,7 @@ impl MeshScene {
                     let x = Self::parse_f32(&mut tokens)?;
                     let y = Self::parse_f32(&mut tokens)?;
                     let z = Self::parse_f32(&mut tokens)?;
-                    let axis = Vec3::from_array([x, y, z]);
+                    let axis = Vec3::new(x, y, z);
 
                     if tokens.next().is_some() {
                         bail!("rotate requires only angle x y z, but extra info was provided");
@@ -142,7 +150,7 @@ impl MeshScene {
                     let x = Self::parse_f32(&mut tokens)?;
                     let y = Self::parse_f32(&mut tokens)?;
                     let z = Self::parse_f32(&mut tokens)?;
-                    let scale = Vec3::from_array([x, y, z]);
+                    let scale = Vec3::new(x, y, z);
 
                     if tokens.next().is_some() {
                         bail!("scale requires only x y z, but extra info was provided");
@@ -155,17 +163,17 @@ impl MeshScene {
                     let eye_x = Self::parse_f32(&mut tokens)?;
                     let eye_y = Self::parse_f32(&mut tokens)?;
                     let eye_z = Self::parse_f32(&mut tokens)?;
-                    let eye = Vec3::from_array([eye_x, eye_y, eye_z]);
+                    let eye = Vec3::new(eye_x, eye_y, eye_z);
 
                     let center_x = Self::parse_f32(&mut tokens)?;
                     let center_y = Self::parse_f32(&mut tokens)?;
                     let center_z = Self::parse_f32(&mut tokens)?;
-                    let center = Vec3::from_array([center_x, center_y, center_z]);
+                    let center = Vec3::new(center_x, center_y, center_z);
 
                     let up_x = Self::parse_f32(&mut tokens)?;
                     let up_y = Self::parse_f32(&mut tokens)?;
                     let up_z = Self::parse_f32(&mut tokens)?;
-                    let up = Vec3::from_array([up_x, up_y, up_z]);
+                    let up = Vec3::new(up_x, up_y, up_z);
 
                     if tokens.next().is_some() {
                         bail!("lookat requires only eye_x eye_y eye_z center_x center_y center_z up_x up_y up_z, but extra info was provided");
@@ -187,6 +195,67 @@ impl MeshScene {
             .next()
             .ok_or(anyhow!("float expected but not found"))?;
         Ok(num.parse()?)
+    }
+
+    fn parse_type_str(type_str: &str) -> Result<ShaderType> {
+        let mut tokens = TokenIter::new(type_str).peekable();
+        Self::parse_type(&mut tokens)
+    }
+
+    fn parse_type<'a>(tokens: &mut Peekable<TokenIter<'a>>) -> Result<ShaderType> {
+        let lookahead = tokens.peek().ok_or(anyhow!("incomplete type - no tokens remaining"))?;
+        let parsed_type = match lookahead {
+            Token::LSqBracket => Self::parse_array(tokens)?,
+            Token::Semicolon => todo!(),
+            Token::Typename(s) => Self::parse_simple_type(tokens)?,
+            Token::Integer(int) => bail!("type should never start with integer token, but started with one: {int}"),
+            Token::RSqBracket => bail!("type should never start with right square bracket"),
+            Token::LexerError(_) => {
+                let Token::LexerError(error) = tokens.next().unwrap() else {
+                    panic!("failed to match lexer error that was just matched on");
+                };
+
+                return Err(error);
+            },
+        };
+
+        Ok(parsed_type)
+    }
+
+    fn parse_array<'a>(mut tokens: &mut Peekable<TokenIter<'a>>) -> Result<ShaderType> {
+        if !matches!(tokens.next().ok_or(anyhow!("no next token"))?, Token::LSqBracket) {
+            bail!("no [ found for start of array");
+        }
+
+        let parsed_type = Self::parse_type(tokens)?;
+
+        if !matches!(tokens.next().ok_or(anyhow!("no next token"))?, Token::Semicolon) {
+            bail!("no semicolon found after parsing array type")
+        }
+
+        let Token::Integer(array_size) = tokens.next().ok_or(anyhow!("no next token"))? else {
+            bail!("array size should be a constant unsigned integer")
+        };
+
+        if !matches!(tokens.next().ok_or(anyhow!("no next token"))?, Token::RSqBracket) {
+            bail!("no ] found for end of array")
+        }
+
+        Ok(ShaderType::Array(Box::new(parsed_type), array_size))
+    }
+
+    fn parse_simple_type<'a>(mut tokens: &mut Peekable<TokenIter<'a>>) -> Result<ShaderType> {
+        let the_token = tokens.next().ok_or(anyhow!("no next token"))?;
+        let Token::Typename(typename) = the_token else {
+            bail!("token was not a typename: {:?}", the_token)
+        };
+        Ok(match typename {
+            "float" => ShaderType::Float,
+            "int" => ShaderType::Int,
+            "uint" => ShaderType::UInt,
+            "vec3" => ShaderType::Vec3,
+            s => bail!("invalid typename: {s}")
+        })
     }
 
     fn parse_camera(conf: Table) -> Result<Camera> {
@@ -224,6 +293,8 @@ impl MeshScene {
 
 #[cfg(test)]
 mod tests {
+    use glam::{Vec3, Vec4};
+
     use super::MeshScene;
 
     #[test]
@@ -231,12 +302,17 @@ mod tests {
         let camera_mat = MeshScene::parse_transform(
             "
         # this is a comment that should be ignored
-        translate 1 1 1
         lookat 3 2 1   0 0 0   0 0 1
         ",
         )
         .expect("failed to parse");
 
-        println!("{camera_mat}");
+        let point = Vec4::new(0f32, 0f32, 0f32, 1f32);
+        let point_cam = camera_mat * point;
+
+        let eye = Vec3::new(3f32, 2f32, 1f32);
+        let dist = eye.dot(eye).sqrt();
+
+        assert!((point_cam.z - dist) < 2e-4, "point_cam.z: {}, ||eye - origin||: {}", point_cam.z, dist);
     }
 }
