@@ -246,7 +246,7 @@ impl RaytraceRenderer {
     fn get_instance_geometry(
         &self,
         acceleration_structure: &khr::acceleration_structure::Device,
-        objects: &[mesh::Instance],
+        objects: &[mesh::Object],
         bottom_accel_structs: &[vk::AccelerationStructureKHR],
         allocator: &mut Allocator,
     ) -> anyhow::Result<(vk::AccelerationStructureGeometryKHR, AllocatedBuffer, u32)> {
@@ -368,7 +368,7 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
 
         let (instance_geometry, instance_buffer, instance_count) = self.get_instance_geometry(
             &acceleration_structure,
-            &scene.instances,
+            &scene.objects,
             &bottom_accel_structs,
             allocator,
         )?;
