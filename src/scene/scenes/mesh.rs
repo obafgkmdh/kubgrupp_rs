@@ -13,7 +13,7 @@ use crate::scene::{type_lexer::{Token, TokenIter}, Scene};
 
 #[derive(Clone)]
 pub struct MeshScene {
-    pub camera_mat: Mat4,
+    pub camera: Camera,
     pub lights: Vec<Light>,
     pub objects: Vec<Object>,
     pub meshes: Vec<Obj>,
@@ -94,7 +94,7 @@ impl MeshScene {
         let camera = Self::parse_toml_camera(conf);
 
         Ok(Self {
-            camera_mat: Mat4::IDENTITY,
+            camera: Camera { view: Mat4::IDENTITY, perspective: Mat4::IDENTITY },
             lights: Vec::new(),
             objects: Vec::new(),
             meshes: Vec::new(),
@@ -143,9 +143,7 @@ impl MeshScene {
             bail!("file path should be a string");
         };
 
-        let file = File::open(dir_path.join(file_path))?;
-
-        todo!()
+        Ok(File::open(dir_path.join(file_path))?)
     }
 
     fn parse_toml_vec3(conf: &Value) -> Result<Vec3> {
