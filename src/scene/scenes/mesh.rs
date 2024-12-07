@@ -74,6 +74,12 @@ enum ShaderType {
     Array(Box<ShaderType>, u64),
 }
 
+struct Shaders {
+    raygen: Shader,
+    miss: Shader,
+    rchit: Vec<Shader>,
+}
+
 #[derive(Debug)]
 pub enum MeshSceneUpdate {
     NewView(Mat4),
@@ -129,6 +135,10 @@ impl MeshScene {
 
         let camera = Self::parse_toml_camera(&conf)?;
 
+        // load the global shaders
+
+        let (meshes, mesh_map) = Self::parse_toml_meshes(&conf)?;
+
         //let mut meshes = Vec::new();
         //let lights = Self::parse_toml_lights(&conf)?;
 
@@ -136,7 +146,7 @@ impl MeshScene {
             camera,
             lights: Vec::new(),
             objects: Vec::new(),
-            meshes: Vec::new(),
+            meshes,
             raygen_shader: Shader::Uncompiled(c"raygen".to_owned(), Default::default()),
             miss_shader: Shader::Uncompiled(c"miss".to_owned(), Default::default()),
             hit_shaders: Vec::new(),
@@ -147,36 +157,61 @@ impl MeshScene {
         conf.get(field).ok_or(anyhow!("field {} not provided", field))
     }
 
-    //fn parse_toml_meshes(conf: &Table) -> Result<(Vec<Obj>, HashMap<String, u32>)> {
-    //    let Value::Array(obj_confs) = Self::get_field(conf, "object")? else {
-    //        bail!("objects field must be an array of objects");
-    //    };
+    fn parse_toml_shaders(conf: &Table) -> Result<Shaders> {
 
-    //    let Value::Array(light_confs) = Self::get_field(conf, "light")? else {
-    //        bail!("lights field must be an array of objects");
-    //    };
+        todo!()
+    }
 
-    //    // get only the area light configs
-    //    let area_lights = light_confs.iter().filter(|x| )
+    fn parse_toml_meshes(conf: &Table) -> Result<(Vec<Obj>, HashMap<String, u32>)> {
+        let Value::Array(obj_confs) = Self::get_field(conf, "object")? else {
+            bail!("objects field must be an array of objects");
+        };
 
-    //    let obj_confs = obj_confs.clone().extend(light)
+        let Value::Array(light_confs) = Self::get_field(conf, "light")? else {
+            bail!("lights field must be an array of objects");
+        };
 
-    //    let meshes = Vec::new();
+        // get only the area light configs
+        let area_lights = light_confs.iter().filter(|c| {
+            let Value::Table(light_conf) = c else {
+                return false;
+            };
+            let Ok(Value::String(light_type)) = Self::get_field(light_conf, "type") else {
+                return false;
+            };
 
-    //    for obj in obj_confs {
-    //        let Value::Table(obj) = obj else {
-    //            bail!("objects array must only contain objects, but found {}", obj);
-    //        };
+            light_type == "area"
+        });
 
-    //        let Value::String(file_name) = Self::get_field(obj, "mesh") else {
-    //            bail!("")
-    //        };
-    //    }
+        let mut meshes = Vec::new();
+        let mut mesh_map = HashMap::new();
 
-    //    Ok(meshes)
-    //}
+        for obj in obj_confs.iter().chain(area_lights) {
+            let Value::Table(obj) = obj else {
+                bail!("expected table, but found {}", obj);
+            };
 
-    fn parse_toml_lights(conf: &Table, meshes: &[Obj]) -> Result<Vec<Light>> {
+            let Value::String(mesh_name) = Self::get_field(obj, "mesh")? else {
+                bail!("expected mesh name to be a string")
+            };
+
+            // don't add a mesh multiple times
+            if mesh_map.contains_key(mesh_name) {
+                continue;
+            }
+
+            let mesh_file = Self::parse_toml_file(MESHES_DIR, Self::get_field(obj, "mesh")?)?;
+            let reader = BufReader::new(mesh_file);
+            let mesh: Obj = obj::load_obj(reader)?;
+
+            mesh_map.insert(mesh_name.clone(), meshes.len() as u32);
+            meshes.push(mesh);
+        }
+
+        Ok((meshes, mesh_map))
+    }
+
+    fn parse_toml_lights(conf: &Table, mesh_map: &HashMap<String, u32>, ) -> Result<Vec<Light>> {
         let Value::Array(light_confs) = conf.get("light").ok_or(anyhow!("no lights field provided"))? else {
             bail!("lights field must be an array of lights");
         };
@@ -512,10 +547,20 @@ mod tests {
 
         let conf: Table = toml_conf.parse().unwrap();
 
-        let mut light_meshes = Vec::new();
-        let lights = MeshScene::parse_toml_lights(&conf, &mut light_meshes).unwrap();
+        //let lights = MeshScene::parse_toml_lights(&conf, &mut light_meshes).unwrap();
+        //println!("{:?}", lights);
+        //println!("{:?}", light_meshes);
+    }
 
-        println!("{:?}", lights);
-        println!("{:?}", light_meshes);
+    #[test]
+    fn parse_meshes() {
+        let mut file = File::open("resources/scenes/cubes.toml").unwrap();
+
+        let mut toml_conf = String::new();
+        file.read_to_string(&mut toml_conf).unwrap();
+
+        let conf: Table = toml_conf.parse().unwrap();
+
+        let (meshes,mesh_map) = MeshScene::parse_toml_meshes(&conf).unwrap();
     }
 }
