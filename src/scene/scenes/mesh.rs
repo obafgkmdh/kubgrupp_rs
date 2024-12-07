@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap, f32::consts::PI, fs::File, io::{BufReader, Read}, iter::Peekable, path::Path
+    collections::HashMap, f32::consts::PI, ffi::{CStr, CString}, fs::File, io::{BufReader, Read}, iter::Peekable, path::Path
 };
 
 use anyhow::{anyhow, bail, Result};
@@ -50,8 +50,8 @@ pub enum Light {
 
 #[derive(Clone)]
 pub enum Shader {
-    Uncompiled(Vec<u8>),
-    Compiled(vk::ShaderModule),
+    Uncompiled(CString, Vec<u8>),
+    Compiled(CString, vk::ShaderModule),
 }
 
 #[derive(Clone)]
@@ -87,12 +87,21 @@ impl Scene for MeshScene {
 
 impl Shader {
     pub fn module(&self) -> vk::ShaderModule {
-        let Shader::Compiled(module) = self else {
+        let Shader::Compiled(_, module) = self else {
             panic!("shader is not compiled")
         };
 
         *module
     }
+
+    pub fn name(&self) -> &CStr {
+        match self {
+            Shader::Uncompiled(name, _) => name,
+            Shader::Compiled(name, _) => name,
+        }
+    }
+
+    //pub fn compile(&mut self, instance: Instance)
 }
 
 impl MeshScene {
@@ -111,8 +120,8 @@ impl MeshScene {
             lights: Vec::new(),
             objects: Vec::new(),
             meshes: Vec::new(),
-            raygen_shader: Shader::Uncompiled(Vec::new()),
-            miss_shader: Shader::Uncompiled(Vec::new()),
+            raygen_shader: Shader::Uncompiled(c"raygen".to_owned(), Vec::new()),
+            miss_shader: Shader::Uncompiled(c"miss".to_owned(), Vec::new()),
             hit_shaders: Vec::new(),
         })
     }
