@@ -11,6 +11,9 @@ use toml::{Table, Value};
 
 use crate::scene::{type_lexer::{Token, TokenIter}, Scene};
 
+const MESHES_DIR: &str = "resources/meshes";
+const SHADERS_DIR: &str = "resources/shaders";
+
 #[derive(Clone)]
 pub struct MeshScene {
     pub camera: Camera,
@@ -82,6 +85,16 @@ impl Scene for MeshScene {
     type Updates = [MeshSceneUpdate];
 }
 
+impl Shader {
+    pub fn module(&self) -> vk::ShaderModule {
+        let Shader::Compiled(module) = self else {
+            panic!("shader is not compiled")
+        };
+
+        *module
+    }
+}
+
 impl MeshScene {
     pub const MAX_LIGHTS: u32 = 1000;
 
@@ -111,8 +124,8 @@ impl MeshScene {
 
         let mut lights = Vec::new();
 
-        for light in light_confs {
-            let Value::String(light_type) = conf.get("type").ok_or(anyhow!("no type field found for light"))? else {
+        for light_conf in light_confs {
+            let Value::String(light_type) = light_conf.get("type").ok_or(anyhow!("no type field found for light"))? else {
                 bail!("light type must be a string");
             };
 
@@ -123,7 +136,10 @@ impl MeshScene {
                     Light::Point { color, position, }
                 },
                 "area" => {
-                    let mesh = conf.get("mesh").ok_or(anyhow!("no mesh file provided"))?;
+                    let mesh_file = Self::parse_toml_file(MESHES_DIR, conf.get("mesh").ok_or(anyhow!("no mesh file provided"))?)?;
+                    let reader = BufReader::new(mesh_file);
+
+                    let mesh: Obj = obj::load_obj(reader)?;
 
                     todo!()
                 }
