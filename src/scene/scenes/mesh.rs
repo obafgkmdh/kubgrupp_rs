@@ -1,12 +1,10 @@
 use std::{
-    collections::HashMap,
-    f32::consts::PI,
-    io::{BufReader, Read}, iter::Peekable,
+    collections::HashMap, f32::consts::PI, fs::File, io::{BufReader, Read}, iter::Peekable, path::Path
 };
 
 use anyhow::{anyhow, bail, Result};
 use ash::vk;
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Vec2, Vec3};
 use obj::Obj;
 use serde::Deserialize;
 use toml::{Table, Value};
@@ -17,9 +15,10 @@ use crate::scene::{type_lexer::{Token, TokenIter}, Scene};
 pub struct MeshScene {
     pub camera_mat: Mat4,
     pub lights: Vec<Light>,
-    pub instances: Vec<Instance>,
+    pub objects: Vec<Object>,
     pub meshes: Vec<Obj>,
 
+    pub raygen_shader: Shader,
     pub miss_shader: Shader,
     pub hit_shaders: Vec<Shader>,
 }
@@ -39,25 +38,21 @@ pub enum Light {
         color: Vec3,
         position: Vec3,
     },
-    Area {
+    Triangle {
         color: Vec3,
-        mesh: Obj,
-        transform: Mat4,
-    },
-    Spotlight {
-        color: Vec3,
-        transform: Mat4,
-        angle: f32,
+        vertices: [Vec3; 3],
+        normal: Vec3,
     },
 }
 
 #[derive(Clone)]
-pub struct Shader {
-    pub code: vk::ShaderModule,
+pub enum Shader {
+    Uncompiled(Vec<u8>),
+    Compiled(vk::ShaderModule),
 }
 
 #[derive(Clone)]
-pub struct Instance {
+pub struct Object {
     pub transform: Mat4,
 
     // its just like aris fr
@@ -67,6 +62,7 @@ pub struct Instance {
     pub alignment: usize,
 }
 
+#[derive(Debug, PartialEq)]
 enum ShaderType {
     Float,
     Vec3,
@@ -75,6 +71,7 @@ enum ShaderType {
     Array(Box<ShaderType>, u64),
 }
 
+#[derive(Debug)]
 pub enum MeshSceneUpdate {
     NewView(Mat4),
     NewAspectRatio(f32),
@@ -94,16 +91,95 @@ impl MeshScene {
 
         let conf: Table = toml_conf.parse()?;
 
-        let camera = Self::parse_camera(conf);
+        let camera = Self::parse_toml_camera(conf);
 
         Ok(Self {
             camera_mat: Mat4::IDENTITY,
             lights: Vec::new(),
-            instances: Vec::new(),
+            objects: Vec::new(),
             meshes: Vec::new(),
-            miss_shader: Shader { code: vk::ShaderModule::null() },
+            raygen_shader: Shader::Uncompiled(Vec::new()),
+            miss_shader: Shader::Uncompiled(Vec::new()),
             hit_shaders: Vec::new(),
         })
+    }
+
+    pub fn parse_toml_lights(conf: Table, meshes: &mut Vec<Obj>) -> Result<Vec<Light>> {
+        let Value::Array(light_confs) = conf.get("light").ok_or(anyhow!("no lights provided"))? else {
+            bail!("lights field must be an array of lights");
+        };
+
+        let mut lights = Vec::new();
+
+        for light in light_confs {
+            let Value::String(light_type) = conf.get("type").ok_or(anyhow!("no type field found for light"))? else {
+                bail!("light type must be a string");
+            };
+
+            let light = match light_type.as_str() {
+                "point" => {
+                    let color = Self::parse_toml_vec3(conf.get("color").ok_or(anyhow!("no color field found for light"))?)?;
+                    let position = Self::parse_toml_vec3(conf.get("position").ok_or(anyhow!("no top_left field found for light"))?)?;
+                    Light::Point { color, position, }
+                },
+                "area" => {
+                    let mesh = conf.get("mesh").ok_or(anyhow!("no mesh file provided"))?;
+
+                    todo!()
+                }
+                _ => bail!("unknown light type"),
+            };
+
+            lights.push(light);
+        }
+
+        Ok(lights)
+    }
+
+    fn parse_toml_file(dir: impl AsRef<Path>, conf: &Value) -> Result<File> {
+        let dir_path = dir.as_ref();
+
+        let Value::String(file_path) = conf else {
+            bail!("file path should be a string");
+        };
+
+        let file = File::open(dir_path.join(file_path))?;
+
+        todo!()
+    }
+
+    fn parse_toml_vec3(conf: &Value) -> Result<Vec3> {
+        let Value::Array(values) = conf else {
+            bail!("array was not provided for vec3");
+        };
+
+        let mut values = values.iter();
+
+        let x = Self::parse_toml_f32(values.next().ok_or(anyhow!("vec3 requires x y z - x not provided"))?)?;
+        let y = Self::parse_toml_f32(values.next().ok_or(anyhow!("vec3 requires x y z - y not provided"))?)?;
+        let z = Self::parse_toml_f32(values.next().ok_or(anyhow!("vec3 requires x y z - xznot provided"))?)?;
+
+        if values.next().is_some() {
+            bail!("vec3 requires 3 arguments x y z, but saw extra");
+        }
+
+        Ok(Vec3::new(x, y, z))
+    }
+
+    fn parse_toml_f32(val: &Value) -> Result<f32> {
+        Ok(match val {
+            Value::Integer(x) => *x as f32,
+            Value::Float(x) => *x as f32,
+            _ => bail!("float requires toml int or float"),
+        })
+    }
+
+    fn parse_toml_transform(value: &Value) -> Result<Mat4> {
+        let Value::String(transform_str) = value else {
+            bail!("transform must be a string");
+        };
+
+        Self::parse_transform(transform_str)
     }
 
     fn parse_transform(transform_str: &str) -> Result<Mat4> {
@@ -207,7 +283,7 @@ impl MeshScene {
         let parsed_type = match lookahead {
             Token::LSqBracket => Self::parse_array(tokens)?,
             Token::Semicolon => todo!(),
-            Token::Typename(s) => Self::parse_simple_type(tokens)?,
+            Token::Typename(_) => Self::parse_simple_type(tokens)?,
             Token::Integer(int) => bail!("type should never start with integer token, but started with one: {int}"),
             Token::RSqBracket => bail!("type should never start with right square bracket"),
             Token::LexerError(_) => {
@@ -222,7 +298,7 @@ impl MeshScene {
         Ok(parsed_type)
     }
 
-    fn parse_array<'a>(mut tokens: &mut Peekable<TokenIter<'a>>) -> Result<ShaderType> {
+    fn parse_array<'a>(tokens: &mut Peekable<TokenIter<'a>>) -> Result<ShaderType> {
         if !matches!(tokens.next().ok_or(anyhow!("no next token"))?, Token::LSqBracket) {
             bail!("no [ found for start of array");
         }
@@ -244,7 +320,7 @@ impl MeshScene {
         Ok(ShaderType::Array(Box::new(parsed_type), array_size))
     }
 
-    fn parse_simple_type<'a>(mut tokens: &mut Peekable<TokenIter<'a>>) -> Result<ShaderType> {
+    fn parse_simple_type<'a>(tokens: &mut Peekable<TokenIter<'a>>) -> Result<ShaderType> {
         let the_token = tokens.next().ok_or(anyhow!("no next token"))?;
         let Token::Typename(typename) = the_token else {
             bail!("token was not a typename: {:?}", the_token)
@@ -258,7 +334,7 @@ impl MeshScene {
         })
     }
 
-    fn parse_camera(conf: Table) -> Result<Camera> {
+    fn parse_toml_camera(conf: Table) -> Result<Camera> {
         let Some(Value::Table(camera_table)) = conf.get("camera") else {
             bail!("camera must be a table")
         };
@@ -295,6 +371,8 @@ impl MeshScene {
 mod tests {
     use glam::{Vec3, Vec4};
 
+    use crate::scene::scenes::mesh::{Shader, ShaderType};
+
     use super::MeshScene;
 
     #[test]
@@ -314,5 +392,19 @@ mod tests {
         let dist = eye.dot(eye).sqrt();
 
         assert!((point_cam.z - dist) < 2e-4, "point_cam.z: {}, ||eye - origin||: {}", point_cam.z, dist);
+    }
+
+    #[test]
+    fn parse_type_complicated() {
+        let parsed_type = MeshScene::parse_type_str("[[vec3; 3]; 1]").expect("failed to parse");
+
+        assert_eq!(parsed_type, ShaderType::Array(
+            Box::new(
+                ShaderType::Array(
+                    Box::new(ShaderType::Vec3),
+                    3
+                )),
+            1
+        ))
     }
 }

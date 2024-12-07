@@ -9,12 +9,12 @@ fov = 70
 
 [[light]]
 type = "point"
-radiance = [0.84, 0.76, 0.56]
+color = [0.84, 0.76, 0.56]
 position = [-5, -5, 10]
 
 [[light]]
 type = "point"
-radiance = [0.5, 0.5, 0.5]
+color = [0.5, 0.5, 0.5]
 position = [5, 5, 10]
 
 [[brdf]]
