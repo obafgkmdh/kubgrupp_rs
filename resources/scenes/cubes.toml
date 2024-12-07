@@ -1,5 +1,6 @@
 [global_shaders]
 miss = "black.miss"
+emitter_hit = "emitter.rchit"
 
 [camera]
 view = '''
@@ -16,6 +17,15 @@ position = [-5, -5, 10]
 type = "point"
 color = [0.5, 0.5, 0.5]
 position = [5, 5, 10]
+
+[[light]]
+type = "area"
+color = [0.5, 0.1, 0.5]
+mesh = "square.obj"
+transform = '''
+rotate 45 0 0 1
+translate 3 0 0
+'''
 
 [[brdf]]
 name = "flat"
