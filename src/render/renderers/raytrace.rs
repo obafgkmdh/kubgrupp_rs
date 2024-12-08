@@ -44,7 +44,9 @@ pub struct RaytraceRenderer {
     offsets_descriptor_set: vk::DescriptorSet,
     brdf_params_descriptor_set: vk::DescriptorSet,
     storage_image: vk::Image,
+    storage_image_view: vk::ImageView,
     storage_image_allocation: Allocation,
+    vertex_normal_buffer: Option<AllocatedBuffer>,
 }
 
 impl RaytraceRenderer {
@@ -554,6 +556,93 @@ impl RaytraceRenderer {
         Ok((pipeline_layout, pipeline, shader_groups.len()))
     }
 
+    unsafe fn copy_buffer(
+        &self,
+        src: vk::Buffer,
+        dst: vk::Buffer,
+        size: u64,
+    ) -> anyhow::Result<()> {
+        let command_buffer_allocate_info = vk::CommandBufferAllocateInfo {
+            command_buffer_count: 1,
+            command_pool: self.command_pool,
+            level: vk::CommandBufferLevel::PRIMARY,
+            ..Default::default()
+        };
+
+        let command_buffer = self
+            .device
+            .allocate_command_buffers(&command_buffer_allocate_info)?[0];
+
+        let command_buffer_begin_info = vk::CommandBufferBeginInfo {
+            flags: vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT,
+            ..Default::default()
+        };
+
+        self.device
+            .begin_command_buffer(command_buffer, &command_buffer_begin_info)?;
+
+        self.device.cmd_copy_buffer(
+            command_buffer,
+            src,
+            dst,
+            &[vk::BufferCopy {
+                src_offset: 0,
+                dst_offset: 0,
+                size,
+            }],
+        );
+
+        self.device.end_command_buffer(command_buffer)?;
+
+        let submit_info = vk::SubmitInfo {
+            command_buffer_count: 1,
+            p_command_buffers: &raw const command_buffer,
+            ..Default::default()
+        };
+
+        self.device
+            .queue_submit(self.compute_queue, &[submit_info], vk::Fence::null())?;
+
+        self.device.queue_wait_idle(self.compute_queue)?;
+        self.device
+            .free_command_buffers(self.command_pool, &[command_buffer]);
+
+        Ok(())
+    }
+
+    unsafe fn create_device_buffer<T: Copy>(
+        &self,
+        data: &[T],
+        usage: vk::BufferUsageFlags,
+        allocator: &mut Allocator,
+    ) -> anyhow::Result<AllocatedBuffer> {
+        let size = std::mem::size_of_val(data) as u64;
+        let mut staging_buffer = AllocatedBuffer::new(
+            &self.device,
+            allocator,
+            size,
+            vk::BufferUsageFlags::TRANSFER_SRC,
+            MemoryLocation::CpuToGpu,
+            self.device_properties.limits,
+        )?;
+        staging_buffer.store(data)?;
+
+        let buffer = AllocatedBuffer::new(
+            &self.device,
+            allocator,
+            size,
+            usage | vk::BufferUsageFlags::TRANSFER_DST,
+            MemoryLocation::GpuOnly,
+            self.device_properties.limits,
+        )?;
+
+        self.copy_buffer(staging_buffer.buffer, buffer.buffer, size)?;
+
+        staging_buffer.destroy(&self.device, allocator)?;
+
+        Ok(buffer)
+    }
+
     fn create_sbt(
         &self,
         shader_group_count: usize,
@@ -602,75 +691,14 @@ impl RaytraceRenderer {
             );
         }
 
-        let mut staging_buffer = AllocatedBuffer::new(
-            &self.device,
-            allocator,
-            table_size as u64,
-            vk::BufferUsageFlags::TRANSFER_SRC,
-            MemoryLocation::CpuToGpu,
-            self.device_properties.limits,
-        )?;
-        staging_buffer.store(&table_data)?;
-
-        let sbt_buffer = AllocatedBuffer::new(
-            &self.device,
-            allocator,
-            table_size as u64,
-            vk::BufferUsageFlags::TRANSFER_DST
-                | vk::BufferUsageFlags::SHADER_BINDING_TABLE_KHR
-                | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
-            MemoryLocation::GpuOnly,
-            self.device_properties.limits,
-        )?;
-
-        unsafe {
-            let command_buffer_allocate_info = vk::CommandBufferAllocateInfo {
-                command_buffer_count: 1,
-                command_pool: self.command_pool,
-                level: vk::CommandBufferLevel::PRIMARY,
-                ..Default::default()
-            };
-
-            let command_buffer = self
-                .device
-                .allocate_command_buffers(&command_buffer_allocate_info)?[0];
-
-            let command_buffer_begin_info = vk::CommandBufferBeginInfo {
-                flags: vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT,
-                ..Default::default()
-            };
-
-            self.device
-                .begin_command_buffer(command_buffer, &command_buffer_begin_info)?;
-
-            self.device.cmd_copy_buffer(
-                command_buffer,
-                staging_buffer.buffer,
-                sbt_buffer.buffer,
-                &[vk::BufferCopy {
-                    src_offset: 0,
-                    dst_offset: 0,
-                    size: table_size as u64,
-                }],
-            );
-
-            self.device.end_command_buffer(command_buffer)?;
-
-            let submit_info = vk::SubmitInfo {
-                command_buffer_count: 1,
-                p_command_buffers: &raw const command_buffer,
-                ..Default::default()
-            };
-
-            self.device
-                .queue_submit(self.compute_queue, &[submit_info], vk::Fence::null())?;
-
-            self.device.queue_wait_idle(self.compute_queue)?;
-            self.device
-                .free_command_buffers(self.command_pool, &[command_buffer]);
-        }
-
-        unsafe { staging_buffer.destroy(&self.device, allocator)? };
+        let sbt_buffer = unsafe {
+            self.create_device_buffer(
+                &table_data,
+                vk::BufferUsageFlags::SHADER_BINDING_TABLE_KHR
+                    | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+                allocator,
+            )?
+        };
 
         let sbt_address = unsafe { sbt_buffer.get_device_address(&self.device) };
         let raygen_region = vk::StridedDeviceAddressRegionKHR {
@@ -741,7 +769,7 @@ impl RaytraceRenderer {
         &self,
         window_data: &WindowData,
         allocator: &mut Allocator,
-    ) -> anyhow::Result<(vk::Image, Allocation)> {
+    ) -> anyhow::Result<(vk::Image, vk::ImageView, Allocation)> {
         let image_create_info = vk::ImageCreateInfo {
             image_type: vk::ImageType::TYPE_2D,
             format: vk::Format::R8G8B8A8_SRGB,
@@ -777,6 +805,27 @@ impl RaytraceRenderer {
                 image_allocation.offset(),
             )?;
         }
+
+        let image_view = {
+            let image_view_create_info = vk::ImageViewCreateInfo {
+                view_type: vk::ImageViewType::TYPE_2D,
+                format: image_create_info.format,
+                subresource_range: vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                image,
+                ..Default::default()
+            };
+
+            unsafe {
+                self.device
+                    .create_image_view(&image_view_create_info, None)?
+            }
+        };
 
         let command_buffer = {
             let allocate_info = vk::CommandBufferAllocateInfo {
@@ -834,7 +883,7 @@ impl RaytraceRenderer {
                 .free_command_buffers(self.command_pool, &[command_buffer]);
         }
 
-        Ok((image, image_allocation))
+        Ok((image, image_view, image_allocation))
     }
 }
 
@@ -903,11 +952,16 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             offsets_descriptor_set: Default::default(),
             brdf_params_descriptor_set: Default::default(),
             storage_image: Default::default(),
+            storage_image_view: Default::default(),
             storage_image_allocation: Default::default(),
+            vertex_normal_buffer: Default::default(),
         };
 
-        (out.storage_image, out.storage_image_allocation) =
-            out.create_storage_image(target, allocator)?;
+        (
+            out.storage_image,
+            out.storage_image_view,
+            out.storage_image_allocation,
+        ) = out.create_storage_image(target, allocator)?;
 
         Ok(out)
     }
@@ -989,15 +1043,78 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             brdf_params_bindless_count,
         )?;
 
+        let vertex_normal_data: Vec<f32> = scene
+            .meshes
+            .iter()
+            .flat_map(|x| {
+                x.mesh
+                    .positions
+                    .chunks_exact(3)
+                    .zip(x.mesh.normals.chunks_exact(3))
+                    .flat_map(|(p, n)| p.iter().chain(n.iter()))
+            })
+            .map(|&x| x)
+            .collect();
+
+        self.vertex_normal_buffer = Some(unsafe {
+            self.create_device_buffer(
+                &vertex_normal_data,
+                vk::BufferUsageFlags::STORAGE_BUFFER,
+                allocator,
+            )?
+        });
+
+        let image_info = vk::DescriptorImageInfo {
+            image_layout: vk::ImageLayout::GENERAL,
+            image_view: self.storage_image_view,
+            sampler: vk::Sampler::null(),
+        };
+        let image_write = vk::WriteDescriptorSet {
+            dst_set: self.global_descriptor_set,
+            dst_binding: 0,
+            dst_array_element: 0,
+            descriptor_type: vk::DescriptorType::STORAGE_IMAGE,
+            descriptor_count: 1,
+            p_image_info: &raw const image_info,
+            ..Default::default()
+        };
+
         let accel_info = vk::WriteDescriptorSetAccelerationStructureKHR {
             acceleration_structure_count: 1,
             p_acceleration_structures: &raw const self.top_as,
             ..Default::default()
         };
-        // let accel_write = vk::WriteDescriptorSet {
-        //     dst_set: self.global_descriptor_set,
+        let accel_write = vk::WriteDescriptorSet {
+            dst_set: self.global_descriptor_set,
+            dst_binding: 1,
+            dst_array_element: 0,
+            descriptor_type: vk::DescriptorType::ACCELERATION_STRUCTURE_KHR,
+            descriptor_count: 1,
+            p_next: &raw const accel_info as *const std::ffi::c_void,
+            ..Default::default()
+        };
 
-        // }
+        let vertex_normal_buffer_info = vk::DescriptorBufferInfo {
+            buffer: self.vertex_normal_buffer.as_ref().unwrap().buffer,
+            range: vk::WHOLE_SIZE,
+            offset: 0,
+        };
+        let vertex_normal_buffer_write = vk::WriteDescriptorSet {
+            dst_set: self.global_descriptor_set,
+            dst_binding: 2,
+            dst_array_element: 0,
+            descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
+            descriptor_count: 1,
+            p_buffer_info: &raw const vertex_normal_buffer_info,
+            ..Default::default()
+        };
+
+        unsafe {
+            self.device.update_descriptor_sets(
+                &[image_write, accel_write, vertex_normal_buffer_write],
+                &[],
+            );
+        }
 
         Ok(())
     }
