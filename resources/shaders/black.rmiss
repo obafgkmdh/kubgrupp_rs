@@ -8,10 +8,6 @@
 
 layout(location = 0) rayPayloadInEXT RayPayload ray_info;
 
-layout(set = 1, binding = 0) uniform Fields {
-    vec3 albedo;
-} instance_info[];
-
 void main() {
-    ray_info.rad = instance_info[nonuniformEXT(gl_InstanceID)].albedo;
+    ray_info.rad = vec3(0,0,0);
 }
