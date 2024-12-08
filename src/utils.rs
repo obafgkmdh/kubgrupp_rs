@@ -46,6 +46,10 @@ pub fn query_queue_families(
     Ok(info)
 }
 
+pub fn align_up(value: u32, alignment: u32) -> u32 {
+    (value + alignment - 1) & !(alignment - 1)
+}
+
 pub struct AllocatedBuffer {
     pub buffer: vk::Buffer,
     allocation: Allocation,

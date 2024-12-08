@@ -3,7 +3,7 @@ use std::{ffi::c_char, sync::LazyLock};
 use anyhow::anyhow;
 use ash::{khr, vk, Device, Entry, Instance};
 use gpu_allocator::{vulkan::*, MemoryLocation};
-use obj::Obj;
+use tobj::Model;
 
 use crate::{
     features::{vk_features, VkFeatureGuard, VkFeatures},
@@ -12,7 +12,7 @@ use crate::{
         scenes::mesh::{MeshScene, Object},
         Scene,
     },
-    utils::{AllocatedBuffer, QueueFamilyInfo},
+    utils::{align_up, AllocatedBuffer, QueueFamilyInfo},
     window::WindowData,
 };
 
@@ -32,6 +32,11 @@ pub struct RaytraceRenderer {
     bottom_as_buffers: Vec<AllocatedBuffer>,
     pipeline_layout: vk::PipelineLayout,
     pipeline: vk::Pipeline,
+    sbt_buffer: Option<AllocatedBuffer>,
+    raygen_region: vk::StridedDeviceAddressRegionKHR,
+    miss_region: vk::StridedDeviceAddressRegionKHR,
+    hit_region: vk::StridedDeviceAddressRegionKHR,
+    callable_region: vk::StridedDeviceAddressRegionKHR,
 }
 
 impl RaytraceRenderer {
@@ -178,7 +183,7 @@ impl RaytraceRenderer {
 
     fn get_mesh_geometries(
         &self,
-        meshes: &[Obj],
+        meshes: &[Model],
         allocator: &mut Allocator,
     ) -> anyhow::Result<(
         Vec<vk::AccelerationStructureGeometryKHR<'static>>,
@@ -189,8 +194,8 @@ impl RaytraceRenderer {
         let mut buffers = Vec::new();
         let mut primitive_counts = Vec::new();
         for mesh in meshes {
-            let vertex_count = mesh.vertices.len();
-            let vertex_stride = std::mem::size_of_val(&mesh.vertices[0].position);
+            let vertex_count = mesh.mesh.positions.len() / 3;
+            let vertex_stride = std::mem::size_of_val(&mesh.mesh.positions[0]) * 3;
 
             let mut vertex_buffer = AllocatedBuffer::new(
                 &self.device,
@@ -202,14 +207,10 @@ impl RaytraceRenderer {
                 MemoryLocation::CpuToGpu,
                 self.device_properties.limits,
             )?;
-            let mut real_vertices = Vec::new();
-            for v in mesh.vertices.iter() {
-                real_vertices.extend_from_slice(&v.position);
-            }
-            vertex_buffer.store(&real_vertices)?;
+            vertex_buffer.store(&mesh.mesh.positions)?;
 
-            let index_count = mesh.indices.len();
-            let index_stride = std::mem::size_of_val(&mesh.indices[0]);
+            let index_count = mesh.mesh.indices.len();
+            let index_stride = std::mem::size_of_val(&mesh.mesh.indices[0]);
 
             let mut index_buffer = AllocatedBuffer::new(
                 &self.device,
@@ -221,7 +222,7 @@ impl RaytraceRenderer {
                 MemoryLocation::CpuToGpu,
                 self.device_properties.limits,
             )?;
-            index_buffer.store(&mesh.indices)?;
+            index_buffer.store(&mesh.mesh.indices)?;
 
             let geometry = vk::AccelerationStructureGeometryKHR {
                 geometry_type: vk::GeometryTypeKHR::TRIANGLES,
@@ -240,7 +241,7 @@ impl RaytraceRenderer {
                                 index_buffer.get_device_address(&self.device)
                             },
                         },
-                        index_type: vk::IndexType::UINT16,
+                        index_type: vk::IndexType::UINT32,
                         ..Default::default()
                     },
                 },
@@ -335,6 +336,7 @@ impl RaytraceRenderer {
         let binding_flags_inner = [
             vk::DescriptorBindingFlags::empty(),
             vk::DescriptorBindingFlags::empty(),
+            vk::DescriptorBindingFlags::empty(),
             vk::DescriptorBindingFlags::VARIABLE_DESCRIPTOR_COUNT
                 | vk::DescriptorBindingFlags::PARTIALLY_BOUND,
         ];
@@ -362,13 +364,53 @@ impl RaytraceRenderer {
                 ..Default::default()
             },
             vk::DescriptorSetLayoutBinding {
-                descriptor_count: MeshScene::MAX_LIGHTS,
-                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                stage_flags: vk::ShaderStageFlags::CLOSEST_HIT_KHR,
+                descriptor_count: 1,
+                descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
+                stage_flags: vk::ShaderStageFlags::RAYGEN_KHR
+                    | vk::ShaderStageFlags::CLOSEST_HIT_KHR,
                 binding: 2,
                 ..Default::default()
             },
+            vk::DescriptorSetLayoutBinding {
+                descriptor_count: MeshScene::MAX_LIGHTS,
+                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                stage_flags: vk::ShaderStageFlags::CLOSEST_HIT_KHR,
+                binding: 3,
+                ..Default::default()
+            },
         ];
+
+        let create_info = vk::DescriptorSetLayoutCreateInfo {
+            p_bindings: bindings.as_ptr(),
+            binding_count: bindings.len() as u32,
+            p_next: &raw const binding_flags as *const std::ffi::c_void,
+            ..Default::default()
+        };
+
+        unsafe {
+            Ok(self
+                .device
+                .create_descriptor_set_layout(&create_info, None)?)
+        }
+    }
+
+    fn get_per_object_descriptor_set_layout(&self) -> anyhow::Result<vk::DescriptorSetLayout> {
+        let binding_flags_inner = [vk::DescriptorBindingFlags::VARIABLE_DESCRIPTOR_COUNT
+            | vk::DescriptorBindingFlags::PARTIALLY_BOUND];
+
+        let binding_flags = vk::DescriptorSetLayoutBindingFlagsCreateInfo {
+            binding_count: binding_flags_inner.len() as u32,
+            p_binding_flags: binding_flags_inner.as_ptr(),
+            ..Default::default()
+        };
+
+        let bindings = [vk::DescriptorSetLayoutBinding {
+            descriptor_count: MeshScene::MAX_OBJECTS,
+            descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+            stage_flags: vk::ShaderStageFlags::CLOSEST_HIT_KHR,
+            binding: 0,
+            ..Default::default()
+        }];
 
         let create_info = vk::DescriptorSetLayoutCreateInfo {
             p_bindings: bindings.as_ptr(),
@@ -481,6 +523,149 @@ impl RaytraceRenderer {
 
         Ok((pipeline_layout, pipeline, shader_groups.len()))
     }
+
+    fn create_sbt(
+        &self,
+        shader_group_count: usize,
+        allocator: &mut Allocator,
+    ) -> anyhow::Result<(
+        AllocatedBuffer,
+        vk::StridedDeviceAddressRegionKHR,
+        vk::StridedDeviceAddressRegionKHR,
+        vk::StridedDeviceAddressRegionKHR,
+        vk::StridedDeviceAddressRegionKHR,
+    )> {
+        let unaligned_table_data = unsafe {
+            self.rt_pipeline_device
+                .get_ray_tracing_shader_group_handles(
+                    self.pipeline,
+                    0,
+                    shader_group_count as u32,
+                    shader_group_count
+                        * self.rt_pipeline_properties.shader_group_handle_size as usize,
+                )?
+        };
+
+        let handle_size = self.rt_pipeline_properties.shader_group_handle_size as usize;
+        let handle_stride = align_up(
+            handle_size as u32,
+            self.rt_pipeline_properties.shader_group_handle_alignment,
+        ) as usize;
+        let base_stride = align_up(
+            handle_size as u32,
+            self.rt_pipeline_properties.shader_group_base_alignment,
+        ) as usize;
+
+        let table_size = 2 * base_stride + (shader_group_count - 2) * handle_stride;
+        let mut table_data = vec![0u8; table_size];
+
+        // raygen
+        table_data[0..handle_size].copy_from_slice(&unaligned_table_data[0..handle_size]);
+        // miss
+        table_data[base_stride..base_stride + handle_size]
+            .copy_from_slice(&unaligned_table_data[handle_size..2 * handle_size]);
+        // closest hit
+        for i in 0..shader_group_count - 2 {
+            let aligned_base = 2 * base_stride + i * handle_stride;
+            table_data[aligned_base..aligned_base + handle_size].copy_from_slice(
+                &unaligned_table_data[(i + 2) * handle_size..(i + 3) * handle_size],
+            );
+        }
+
+        let mut staging_buffer = AllocatedBuffer::new(
+            &self.device,
+            allocator,
+            table_size as u64,
+            vk::BufferUsageFlags::TRANSFER_SRC,
+            MemoryLocation::CpuToGpu,
+            self.device_properties.limits,
+        )?;
+        staging_buffer.store(&table_data)?;
+
+        let sbt_buffer = AllocatedBuffer::new(
+            &self.device,
+            allocator,
+            table_size as u64,
+            vk::BufferUsageFlags::TRANSFER_DST
+                | vk::BufferUsageFlags::SHADER_BINDING_TABLE_KHR
+                | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+            MemoryLocation::GpuOnly,
+            self.device_properties.limits,
+        )?;
+
+        unsafe {
+            let command_buffer_allocate_info = vk::CommandBufferAllocateInfo {
+                command_buffer_count: 1,
+                command_pool: self.command_pool,
+                level: vk::CommandBufferLevel::PRIMARY,
+                ..Default::default()
+            };
+
+            let command_buffer = self
+                .device
+                .allocate_command_buffers(&command_buffer_allocate_info)?[0];
+
+            let command_buffer_begin_info = vk::CommandBufferBeginInfo {
+                flags: vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT,
+                ..Default::default()
+            };
+
+            self.device
+                .begin_command_buffer(command_buffer, &command_buffer_begin_info)?;
+
+            self.device.cmd_copy_buffer(
+                command_buffer,
+                staging_buffer.buffer,
+                sbt_buffer.buffer,
+                &[vk::BufferCopy {
+                    src_offset: 0,
+                    dst_offset: 0,
+                    size: table_size as u64,
+                }],
+            );
+
+            self.device.end_command_buffer(command_buffer)?;
+
+            let submit_info = vk::SubmitInfo {
+                command_buffer_count: 1,
+                p_command_buffers: &raw const command_buffer,
+                ..Default::default()
+            };
+
+            self.device
+                .queue_submit(self.compute_queue, &[submit_info], vk::Fence::null())?;
+
+            self.device.queue_wait_idle(self.compute_queue)?;
+        }
+
+        unsafe { staging_buffer.destroy(&self.device, allocator)? };
+
+        let sbt_address = unsafe { sbt_buffer.get_device_address(&self.device) };
+        let raygen_region = vk::StridedDeviceAddressRegionKHR {
+            device_address: sbt_address,
+            stride: handle_stride as u64,
+            size: handle_stride as u64,
+        };
+        let miss_region = vk::StridedDeviceAddressRegionKHR {
+            device_address: sbt_address + base_stride as u64,
+            stride: handle_stride as u64,
+            size: handle_stride as u64,
+        };
+        let hit_region = vk::StridedDeviceAddressRegionKHR {
+            device_address: sbt_address + 2 * base_stride as u64,
+            stride: handle_stride as u64,
+            size: (shader_group_count as u64 - 2) * handle_stride as u64,
+        };
+        let callable_region = vk::StridedDeviceAddressRegionKHR::default();
+
+        Ok((
+            sbt_buffer,
+            raygen_region,
+            miss_region,
+            hit_region,
+            callable_region,
+        ))
+    }
 }
 
 impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
@@ -534,6 +719,11 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             bottom_as_buffers: Default::default(),
             pipeline_layout: Default::default(),
             pipeline: Default::default(),
+            sbt_buffer: Default::default(),
+            raygen_region: Default::default(),
+            miss_region: Default::default(),
+            hit_region: Default::default(),
+            callable_region: Default::default(),
         })
     }
 
@@ -564,34 +754,29 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
         };
 
         let global_descriptor_set_layout = self.get_global_descriptor_set_layout()?;
+        let offsets_descriptor_set_layout = self.get_per_object_descriptor_set_layout()?;
+        let brdf_params_descriptor_set_layout = self.get_per_object_descriptor_set_layout()?;
 
         let shader_group_count: usize;
-        (self.pipeline_layout, self.pipeline, shader_group_count) =
-            self.create_pipeline(scene, &[global_descriptor_set_layout])?;
+        (self.pipeline_layout, self.pipeline, shader_group_count) = self.create_pipeline(
+            scene,
+            &[
+                global_descriptor_set_layout,
+                offsets_descriptor_set_layout,
+                brdf_params_descriptor_set_layout,
+            ],
+        )?;
 
-        let sbt_buffer = {
-            let table_data = unsafe {
-                self.rt_pipeline_device
-                    .get_ray_tracing_shader_group_handles(
-                        self.pipeline,
-                        0,
-                        shader_group_count as u32,
-                        shader_group_count
-                            * self.rt_pipeline_properties.shader_group_handle_size as usize,
-                    )?
-            };
+        let sbt_buffer: AllocatedBuffer;
+        (
+            sbt_buffer,
+            self.raygen_region,
+            self.miss_region,
+            self.hit_region,
+            self.callable_region,
+        ) = self.create_sbt(shader_group_count, allocator)?;
+        self.sbt_buffer = Some(sbt_buffer);
 
-            let mut staging_buffer = AllocatedBuffer::new(
-                &self.device,
-                allocator,
-                table_data.len() as u64,
-                vk::BufferUsageFlags::TRANSFER_SRC | vk::BufferUsageFlags::SHADER_BINDING_TABLE_KHR,
-                MemoryLocation::CpuToGpu,
-                self.device_properties.limits
-            )?;
-
-            staging_buffer.store(&table_data)?;
-        };
         Ok(())
     }
 
