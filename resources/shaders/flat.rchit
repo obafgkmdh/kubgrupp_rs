@@ -3,6 +3,7 @@
 #extension GL_GOOGLE_include_directive : enable
 #extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_EXT_ray_tracing : enable
+#extension GL_EXT_scalar_block_layout : enable
 
 #include "raycommon.glsl"
 
@@ -12,7 +13,7 @@ struct BrdfParams {
     vec3 albedo;
 };
 
-layout(set = 0, binding = 5) readonly buffer Fields {
+layout(scalar, set = 0, binding = 5) readonly buffer Fields {
     BrdfParams params[];
 } instance_info;
 
