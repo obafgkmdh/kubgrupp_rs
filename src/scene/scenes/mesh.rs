@@ -99,7 +99,7 @@ pub enum MeshSceneUpdate {
 }
 
 impl Scene for MeshScene {
-    type Updates = [MeshSceneUpdate];
+    type Update = MeshSceneUpdate;
 }
 
 impl Shader {
@@ -118,7 +118,7 @@ impl Shader {
         }
     }
 
-    pub fn compile(self, device: Device) -> Result<Self> {
+    pub fn compile(self, device: &Device) -> Result<Self> {
         match self {
             Shader::Uncompiled(name, code) => {
                 let create_info = vk::ShaderModuleCreateInfo {

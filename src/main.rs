@@ -89,8 +89,24 @@ where
             ..Default::default()
         });
 
-        let instance = Self::create_instance(&vk_lib, event_loop, debug_utils_info.as_mut())?
-            .defer(|x| unsafe { x.destroy_instance(None) });
+        let validation_feature_enable = [
+            vk::ValidationFeatureEnableEXT::DEBUG_PRINTF,
+            vk::ValidationFeatureEnableEXT::SYNCHRONIZATION_VALIDATION,
+            vk::ValidationFeatureEnableEXT::BEST_PRACTICES,
+        ];
+        let mut validation_features = enable_vk_debug.then(|| vk::ValidationFeaturesEXT {
+            enabled_validation_feature_count: validation_feature_enable.len() as u32,
+            p_enabled_validation_features: validation_feature_enable.as_ptr(),
+            ..Default::default()
+        });
+
+        let instance = Self::create_instance(
+            &vk_lib,
+            event_loop,
+            debug_utils_info.as_mut(),
+            validation_features.as_mut(),
+        )?
+        .defer(|x| unsafe { x.destroy_instance(None) });
 
         let debug_data = debug_utils_info
             .map(|x| {
@@ -158,6 +174,7 @@ where
         vk_lib: &Entry,
         event_loop: &EventLoop<()>,
         debug_utils_info: Option<&mut DebugUtilsMessengerCreateInfoEXT>,
+        validation_features: Option<&mut vk::ValidationFeaturesEXT>,
     ) -> Result<Instance> {
         let (layers, extensions) =
             Self::get_layers_and_extensions(event_loop, debug_utils_info.is_some())?;
@@ -185,6 +202,10 @@ where
 
         if let Some(debug_utils_info) = debug_utils_info {
             create_info = create_info.push_next(debug_utils_info);
+        }
+
+        if let Some(validation_features) = validation_features {
+            create_info = create_info.push_next(validation_features);
         }
 
         unsafe { Ok(vk_lib.create_instance(&create_info, None)?) }
@@ -412,6 +433,13 @@ where
             WindowEvent::CloseRequested => {
                 debug!("Closing window...");
                 event_loop.exit();
+            }
+            WindowEvent::RedrawRequested => {
+                self.renderer
+                    .as_mut()
+                    .unwrap()
+                    .render_to(&[], self.window.as_mut().unwrap())
+                    .expect("failed to render to target");
             }
             _ => (),
         }

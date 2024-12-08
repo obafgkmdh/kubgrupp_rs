@@ -4,6 +4,7 @@
 #extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_EXT_ray_tracing : enable
 #extension GL_EXT_scalar_block_layout : enable
+#extension GL_EXT_debug_printf : enable
 
 #include "raycommon.glsl"
 
@@ -11,12 +12,14 @@ layout(location = 0) rayPayloadInEXT RayPayload ray_info;
 
 struct BrdfParams {
     vec3 color;
+    float _padding;
 };
 
-layout(scalar, set = 0, binding = 5) readonly buffer Fields {
+layout(scalar, set = 0, binding = 6) readonly buffer Fields {
     BrdfParams params[];
 } instance_info;
 
 void main() {
-    ray_info.rad = instance_info.params[nonuniformEXT(gl_InstanceID)].color;
+    debugPrintfEXT("emitter hit");
+    ray_info.rad = vec3(0.0, 0.0, 1.0);//instance_info.params[nonuniformEXT(gl_InstanceID)].color;
 }

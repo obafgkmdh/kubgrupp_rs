@@ -2,5 +2,5 @@ pub mod scenes;
 pub mod type_lexer;
 
 pub trait Scene {
-    type Updates: ?Sized;
+    type Update: Sized;
 }

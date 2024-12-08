@@ -1,4 +1,4 @@
-use std::{ffi::c_char, sync::LazyLock};
+use std::{ffi::c_char, sync::LazyLock, u64};
 
 use anyhow::anyhow;
 use ash::{khr, vk, Device, Entry, Instance};
@@ -9,7 +9,7 @@ use crate::{
     features::{vk_features, VkFeatureGuard, VkFeatures},
     render::Renderer,
     scene::{
-        scenes::mesh::{MeshScene, Object},
+        scenes::mesh::{Light, MeshScene, Object},
         Scene,
     },
     utils::{align_up, AllocatedBuffer, QueueFamilyInfo},
@@ -42,7 +42,12 @@ pub struct RaytraceRenderer {
     storage_image: vk::Image,
     storage_image_view: vk::ImageView,
     storage_image_allocation: Allocation,
+    camera_buffer: Option<AllocatedBuffer>,
     vertex_normal_buffer: Option<AllocatedBuffer>,
+    light_buffer: Option<AllocatedBuffer>,
+    offset_buffer: Option<AllocatedBuffer>,
+    brdf_param_buffer: Option<AllocatedBuffer>,
+    command_buffers: Vec<vk::CommandBuffer>,
 }
 
 impl RaytraceRenderer {
@@ -357,13 +362,22 @@ impl RaytraceRenderer {
                 binding: 1,
                 ..Default::default()
             },
+            // camera
+            vk::DescriptorSetLayoutBinding {
+                descriptor_count: 1,
+                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                stage_flags: vk::ShaderStageFlags::RAYGEN_KHR
+                    | vk::ShaderStageFlags::CLOSEST_HIT_KHR,
+                binding: 2,
+                ..Default::default()
+            },
             // vertices and normals
             vk::DescriptorSetLayoutBinding {
                 descriptor_count: 1,
                 descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
                 stage_flags: vk::ShaderStageFlags::RAYGEN_KHR
                     | vk::ShaderStageFlags::CLOSEST_HIT_KHR,
-                binding: 2,
+                binding: 3,
                 ..Default::default()
             },
             // lights
@@ -371,7 +385,7 @@ impl RaytraceRenderer {
                 descriptor_count: 1,
                 descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
                 stage_flags: vk::ShaderStageFlags::CLOSEST_HIT_KHR,
-                binding: 3,
+                binding: 4,
                 ..Default::default()
             },
             // offsets
@@ -379,7 +393,7 @@ impl RaytraceRenderer {
                 descriptor_count: 1,
                 descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
                 stage_flags: vk::ShaderStageFlags::CLOSEST_HIT_KHR,
-                binding: 4,
+                binding: 5,
                 ..Default::default()
             },
             // brdf params
@@ -387,7 +401,7 @@ impl RaytraceRenderer {
                 descriptor_count: 1,
                 descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
                 stage_flags: vk::ShaderStageFlags::CLOSEST_HIT_KHR,
-                binding: 5,
+                binding: 6,
                 ..Default::default()
             },
         ];
@@ -419,17 +433,9 @@ impl RaytraceRenderer {
         scene: &MeshScene,
         descriptor_set_layouts: &[vk::DescriptorSetLayout],
     ) -> anyhow::Result<(vk::PipelineLayout, vk::Pipeline, usize)> {
-        let push_constants = vk::PushConstantRange {
-            stage_flags: vk::ShaderStageFlags::RAYGEN_KHR,
-            offset: 0,
-            size: std::mem::size_of_val(&scene.camera.perspective) as u32,
-        };
-
         let layout_create_info = vk::PipelineLayoutCreateInfo {
             p_set_layouts: descriptor_set_layouts.as_ptr(),
             set_layout_count: descriptor_set_layouts.len() as u32,
-            p_push_constant_ranges: &raw const push_constants,
-            push_constant_range_count: 1,
             ..Default::default()
         };
         let pipeline_layout = unsafe {
@@ -437,17 +443,19 @@ impl RaytraceRenderer {
                 .create_pipeline_layout(&layout_create_info, None)?
         };
 
+        let raygen_module = scene.raygen_shader.clone().compile(&self.device)?.module();
+        let miss_module = scene.miss_shader.clone().compile(&self.device)?.module();
         let mut shader_stages = vec![
             vk::PipelineShaderStageCreateInfo {
                 stage: vk::ShaderStageFlags::RAYGEN_KHR,
-                module: scene.raygen_shader.module(),
-                p_name: scene.raygen_shader.name().as_ptr(),
+                module: raygen_module,
+                p_name: c"main".as_ptr(),
                 ..Default::default()
             },
             vk::PipelineShaderStageCreateInfo {
                 stage: vk::ShaderStageFlags::MISS_KHR,
-                module: scene.miss_shader.module(),
-                p_name: scene.miss_shader.name().as_ptr(),
+                module: miss_module,
+                p_name: c"main".as_ptr(),
                 ..Default::default()
             },
         ];
@@ -469,11 +477,13 @@ impl RaytraceRenderer {
                 ..Default::default()
             },
         ];
+
         for hit_shader in scene.hit_shaders.iter() {
+            let module = hit_shader.clone().compile(&self.device)?.module();
             shader_stages.push(vk::PipelineShaderStageCreateInfo {
                 stage: vk::ShaderStageFlags::CLOSEST_HIT_KHR,
-                module: hit_shader.module(),
-                p_name: hit_shader.name().as_ptr(),
+                module,
+                p_name: c"main".as_ptr(),
                 ..Default::default()
             });
             shader_groups.push(vk::RayTracingShaderGroupCreateInfoKHR {
@@ -717,12 +727,13 @@ impl RaytraceRenderer {
         window_data: &WindowData,
         allocator: &mut Allocator,
     ) -> anyhow::Result<(vk::Image, vk::ImageView, Allocation)> {
+        let (width, height) = window_data.get_size();
         let image_create_info = vk::ImageCreateInfo {
             image_type: vk::ImageType::TYPE_2D,
-            format: vk::Format::R8G8B8A8_SRGB,
+            format: vk::Format::R8G8B8A8_UNORM,
             extent: vk::Extent3D {
-                width: window_data.image_extent.width,
-                height: window_data.image_extent.height,
+                width,
+                height,
                 depth: 1,
             },
             mip_levels: 1,
@@ -801,7 +812,14 @@ impl RaytraceRenderer {
             ..Default::default()
         };
 
+        let command_buffer_begin_info = vk::CommandBufferBeginInfo {
+            flags: vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT,
+            ..Default::default()
+        };
+
         unsafe {
+            self.device
+                .begin_command_buffer(command_buffer, &command_buffer_begin_info)?;
             self.device.cmd_pipeline_barrier(
                 command_buffer,
                 vk::PipelineStageFlags::ALL_COMMANDS,
@@ -831,6 +849,155 @@ impl RaytraceRenderer {
         }
 
         Ok((image, image_view, image_allocation))
+    }
+
+    fn create_command_buffer(
+        &self,
+        target_images: &[vk::Image],
+        (width, height): (u32, u32),
+    ) -> anyhow::Result<Vec<vk::CommandBuffer>> {
+        let mut command_buffers = Vec::new();
+        for target_image in target_images {
+            let command_buffer = {
+                let allocate_info = vk::CommandBufferAllocateInfo {
+                    command_buffer_count: 1,
+                    command_pool: self.command_pool,
+                    level: vk::CommandBufferLevel::PRIMARY,
+                    ..Default::default()
+                };
+
+                unsafe { self.device.allocate_command_buffers(&allocate_info)?[0] }
+            };
+
+            let command_buffer_begin_info = vk::CommandBufferBeginInfo::default();
+
+            unsafe {
+                self.device
+                    .begin_command_buffer(command_buffer, &command_buffer_begin_info)?;
+
+                self.device.cmd_bind_pipeline(
+                    command_buffer,
+                    vk::PipelineBindPoint::RAY_TRACING_KHR,
+                    self.pipeline,
+                );
+                self.device.cmd_bind_descriptor_sets(
+                    command_buffer,
+                    vk::PipelineBindPoint::RAY_TRACING_KHR,
+                    self.pipeline_layout,
+                    0,
+                    &[self.descriptor_set],
+                    &[],
+                );
+
+                self.rt_pipeline_device.cmd_trace_rays(
+                    command_buffer,
+                    &self.raygen_region,
+                    &self.miss_region,
+                    &self.hit_region,
+                    &self.callable_region,
+                    width,
+                    height,
+                    1,
+                );
+
+                self.device.cmd_pipeline_barrier(
+                    command_buffer,
+                    vk::PipelineStageFlags::RAY_TRACING_SHADER_KHR,
+                    vk::PipelineStageFlags::TRANSFER,
+                    vk::DependencyFlags::empty(),
+                    &[vk::MemoryBarrier {
+                        src_access_mask: vk::AccessFlags::SHADER_WRITE,
+                        dst_access_mask: vk::AccessFlags::TRANSFER_READ,
+                        ..Default::default()
+                    }],
+                    &[],
+                    &[vk::ImageMemoryBarrier {
+                        src_access_mask: vk::AccessFlags::NONE,
+                        dst_access_mask: vk::AccessFlags::TRANSFER_WRITE,
+                        old_layout: vk::ImageLayout::UNDEFINED,
+                        new_layout: vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                        image: *target_image,
+                        subresource_range: vk::ImageSubresourceRange {
+                            aspect_mask: vk::ImageAspectFlags::COLOR,
+                            base_mip_level: 0,
+                            level_count: 1,
+                            base_array_layer: 0,
+                            layer_count: 1,
+                        },
+                        ..Default::default()
+                    }],
+                );
+
+                self.device.cmd_blit_image(
+                    command_buffer,
+                    self.storage_image,
+                    vk::ImageLayout::GENERAL,
+                    *target_image,
+                    vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                    &[vk::ImageBlit {
+                        src_subresource: vk::ImageSubresourceLayers {
+                            aspect_mask: vk::ImageAspectFlags::COLOR,
+                            mip_level: 0,
+                            base_array_layer: 0,
+                            layer_count: 1,
+                        },
+                        src_offsets: [
+                            vk::Offset3D { x: 0, y: 0, z: 0 },
+                            vk::Offset3D {
+                                x: width as i32,
+                                y: height as i32,
+                                z: 1,
+                            },
+                        ],
+                        dst_subresource: vk::ImageSubresourceLayers {
+                            aspect_mask: vk::ImageAspectFlags::COLOR,
+                            mip_level: 0,
+                            base_array_layer: 0,
+                            layer_count: 1,
+                        },
+                        dst_offsets: [
+                            vk::Offset3D { x: 0, y: 0, z: 0 },
+                            vk::Offset3D {
+                                x: width as i32,
+                                y: height as i32,
+                                z: 1,
+                            },
+                        ],
+                    }],
+                    vk::Filter::LINEAR,
+                );
+
+                self.device.cmd_pipeline_barrier(
+                    command_buffer,
+                    vk::PipelineStageFlags::TRANSFER,
+                    vk::PipelineStageFlags::BOTTOM_OF_PIPE,
+                    vk::DependencyFlags::empty(),
+                    &[],
+                    &[],
+                    &[vk::ImageMemoryBarrier {
+                        src_access_mask: vk::AccessFlags::TRANSFER_WRITE,
+                        dst_access_mask: vk::AccessFlags::NONE,
+                        old_layout: vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                        new_layout: vk::ImageLayout::PRESENT_SRC_KHR,
+                        image: *target_image,
+                        subresource_range: vk::ImageSubresourceRange {
+                            aspect_mask: vk::ImageAspectFlags::COLOR,
+                            base_mip_level: 0,
+                            level_count: 1,
+                            base_array_layer: 0,
+                            layer_count: 1,
+                        },
+                        ..Default::default()
+                    }],
+                );
+
+                self.device.end_command_buffer(command_buffer)?;
+            }
+
+            command_buffers.push(command_buffer)
+        }
+
+        Ok(command_buffers)
     }
 }
 
@@ -897,7 +1064,12 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             storage_image: Default::default(),
             storage_image_view: Default::default(),
             storage_image_allocation: Default::default(),
+            camera_buffer: Default::default(),
             vertex_normal_buffer: Default::default(),
+            light_buffer: Default::default(),
+            offset_buffer: Default::default(),
+            brdf_param_buffer: Default::default(),
+            command_buffers: Default::default(),
         };
 
         (
@@ -975,12 +1147,71 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             )?
         });
 
+        let mut light_data = Vec::new();
+        for light in scene.lights.iter() {
+            if let Light::Point { color, position } = light {
+                light_data.extend(color.to_array());
+                light_data.extend(position.to_array());
+            } else if let Light::Triangle { color, vertices } = light {
+                light_data.extend(color.to_array());
+                for vertex in vertices {
+                    light_data.extend(vertex.to_array());
+                }
+            }
+        }
+
+        self.light_buffer = Some(unsafe {
+            self.create_device_buffer(&light_data, vk::BufferUsageFlags::STORAGE_BUFFER, allocator)?
+        });
+
+        let offset_data: Vec<_> = scene.objects.iter().map(|x| x.brdf_params_index).collect();
+
+        self.offset_buffer = Some(unsafe {
+            self.create_device_buffer(
+                &offset_data,
+                vk::BufferUsageFlags::STORAGE_BUFFER,
+                allocator,
+            )?
+        });
+
+        let brdf_param_data: Vec<_> = scene
+            .objects
+            .iter()
+            .flat_map(|x| &x.brdf_params)
+            .map(|&x| x)
+            .collect();
+        self.brdf_param_buffer = Some(unsafe {
+            self.create_device_buffer(
+                &brdf_param_data,
+                vk::BufferUsageFlags::STORAGE_BUFFER,
+                allocator,
+            )?
+        });
+
+        let mut camera_data = Vec::new();
+        let view_proj = scene.camera.perspective * scene.camera.view;
+        let view_inverse = scene.camera.view.inverse();
+        let proj_inverse = scene.camera.perspective.inverse();
+        camera_data.extend(view_proj.to_cols_array());
+        camera_data.extend(view_inverse.to_cols_array());
+        camera_data.extend(proj_inverse.to_cols_array());
+
+        self.camera_buffer = Some(unsafe {
+            self.create_device_buffer(
+                &camera_data,
+                vk::BufferUsageFlags::UNIFORM_BUFFER,
+                allocator,
+            )?
+        });
+
+        let mut writes = Vec::new();
+
         let image_info = vk::DescriptorImageInfo {
             image_layout: vk::ImageLayout::GENERAL,
             image_view: self.storage_image_view,
             sampler: vk::Sampler::null(),
         };
-        let image_write = vk::WriteDescriptorSet {
+        writes.push(vk::WriteDescriptorSet {
             dst_set: self.descriptor_set,
             dst_binding: 0,
             dst_array_element: 0,
@@ -988,14 +1219,14 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             descriptor_count: 1,
             p_image_info: &raw const image_info,
             ..Default::default()
-        };
+        });
 
         let accel_info = vk::WriteDescriptorSetAccelerationStructureKHR {
             acceleration_structure_count: 1,
             p_acceleration_structures: &raw const self.top_as,
             ..Default::default()
         };
-        let accel_write = vk::WriteDescriptorSet {
+        writes.push(vk::WriteDescriptorSet {
             dst_set: self.descriptor_set,
             dst_binding: 1,
             dst_array_element: 0,
@@ -1003,28 +1234,52 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             descriptor_count: 1,
             p_next: &raw const accel_info as *const std::ffi::c_void,
             ..Default::default()
-        };
+        });
 
-        let vertex_normal_buffer_info = vk::DescriptorBufferInfo {
-            buffer: self.vertex_normal_buffer.as_ref().unwrap().buffer,
+        let camera_info = vk::DescriptorBufferInfo {
+            buffer: self.camera_buffer.as_ref().unwrap().buffer,
             range: vk::WHOLE_SIZE,
             offset: 0,
         };
-        let vertex_normal_buffer_write = vk::WriteDescriptorSet {
+        writes.push(vk::WriteDescriptorSet {
             dst_set: self.descriptor_set,
             dst_binding: 2,
             dst_array_element: 0,
-            descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
+            descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
             descriptor_count: 1,
-            p_buffer_info: &raw const vertex_normal_buffer_info,
+            p_buffer_info: &raw const camera_info,
             ..Default::default()
-        };
+        });
+
+        let mut buffer_infos = Vec::new();
+
+        for (i, buf) in [
+            &self.vertex_normal_buffer,
+            &self.light_buffer,
+            &self.offset_buffer,
+            &self.brdf_param_buffer,
+        ]
+        .iter()
+        .enumerate()
+        {
+            buffer_infos.push(vk::DescriptorBufferInfo {
+                buffer: buf.as_ref().unwrap().buffer,
+                range: vk::WHOLE_SIZE,
+                offset: 0,
+            });
+            writes.push(vk::WriteDescriptorSet {
+                dst_set: self.descriptor_set,
+                dst_binding: i as u32 + 3,
+                dst_array_element: 0,
+                descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
+                descriptor_count: 1,
+                p_buffer_info: unsafe { buffer_infos.as_ptr().add(i) },
+                ..Default::default()
+            });
+        }
 
         unsafe {
-            self.device.update_descriptor_sets(
-                &[image_write, accel_write, vertex_normal_buffer_write],
-                &[],
-            );
+            self.device.update_descriptor_sets(&writes, &[]);
         }
 
         Ok(())
@@ -1032,10 +1287,38 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
 
     fn render_to(
         &mut self,
-        updates: &<MeshScene as Scene>::Updates,
+        _updates: &[<MeshScene as Scene>::Update],
         target: &mut WindowData,
     ) -> anyhow::Result<()> {
-        todo!()
+        if self.command_buffers.is_empty() {
+            self.command_buffers =
+                self.create_command_buffer(target.get_images(), target.get_size())?;
+        }
+
+        let image_index = target.acquire_next_image()?;
+        let (image_semaphore, render_semaphore) = target.get_current_semaphores();
+        let wait_stage = vk::PipelineStageFlags::TRANSFER;
+        let submit_info = vk::SubmitInfo {
+            command_buffer_count: 1,
+            p_command_buffers: &raw const self.command_buffers[image_index as usize],
+            signal_semaphore_count: 1,
+            p_signal_semaphores: &raw const render_semaphore,
+            wait_semaphore_count: 1,
+            p_wait_semaphores: &raw const image_semaphore,
+            p_wait_dst_stage_mask: &raw const wait_stage,
+            ..Default::default()
+        };
+
+        let flight_fence = target.get_current_flight_fence();
+
+        unsafe {
+            self.device
+                .queue_submit(self.compute_queue, &[submit_info], flight_fence)?;
+        }
+
+        target.present(self.compute_queue)?;
+
+        Ok(())
     }
 
     fn required_instance_extensions() -> &'static [*const c_char] {
@@ -1057,6 +1340,7 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
                 vk::PhysicalDeviceFeatures {},
                 vk::PhysicalDeviceVulkan12Features {
                     buffer_device_address,
+                    timeline_semaphore,
                 },
                 vk::PhysicalDeviceAccelerationStructureFeaturesKHR {
                     acceleration_structure,
