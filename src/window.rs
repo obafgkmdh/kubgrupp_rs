@@ -16,7 +16,7 @@ pub struct WindowData {
     device: Device,
 
     image_format: vk::Format,
-    image_extent: vk::Extent2D,
+    pub image_extent: vk::Extent2D,
     images: Vec<vk::Image>,
 }
 

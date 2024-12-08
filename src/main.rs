@@ -386,6 +386,8 @@ where
                     &device,
                     physical_device,
                     &queue_family_info,
+                    self.window.as_ref().unwrap(),
+                    self.allocator.as_mut().unwrap(),
                 )
                 .expect("failed to create renderer"),
             );

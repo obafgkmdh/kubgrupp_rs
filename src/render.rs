@@ -23,6 +23,8 @@ where
         device: &Device,
         physical_device: vk::PhysicalDevice,
         queue_family_info: &QueueFamilyInfo,
+        target: &Target,
+        allocator: &mut Allocator,
     ) -> anyhow::Result<Self>;
 
     fn ingest_scene(&mut self, scene: &S, allocator: &mut Allocator) -> anyhow::Result<()>;

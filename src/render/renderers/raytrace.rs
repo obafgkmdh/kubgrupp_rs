@@ -37,6 +37,14 @@ pub struct RaytraceRenderer {
     miss_region: vk::StridedDeviceAddressRegionKHR,
     hit_region: vk::StridedDeviceAddressRegionKHR,
     callable_region: vk::StridedDeviceAddressRegionKHR,
+    global_descriptor_pool: vk::DescriptorPool,
+    offsets_descriptor_pool: vk::DescriptorPool,
+    brdf_params_descriptor_pool: vk::DescriptorPool,
+    global_descriptor_set: vk::DescriptorSet,
+    offsets_descriptor_set: vk::DescriptorSet,
+    brdf_params_descriptor_set: vk::DescriptorSet,
+    storage_image: vk::Image,
+    storage_image_allocation: Allocation,
 }
 
 impl RaytraceRenderer {
@@ -292,7 +300,7 @@ impl RaytraceRenderer {
 
             instances.push(vk::AccelerationStructureInstanceKHR {
                 transform: vk::TransformMatrixKHR { matrix: matrix_3_4 },
-                instance_custom_index_and_mask: vk::Packed24_8::new(object.custom_index, 0xff),
+                instance_custom_index_and_mask: vk::Packed24_8::new(object.vertex_index, 0xff),
                 instance_shader_binding_table_record_offset_and_flags: vk::Packed24_8::new(
                     object.brdf_i as u32,
                     vk::GeometryInstanceFlagsKHR::TRIANGLE_FACING_CULL_DISABLE.as_raw() as u8,
@@ -332,7 +340,9 @@ impl RaytraceRenderer {
         Ok((geometry, instance_buffer, instances.len() as u32))
     }
 
-    fn get_global_descriptor_set_layout(&self) -> anyhow::Result<vk::DescriptorSetLayout> {
+    fn get_global_descriptor_set_layout(
+        &self,
+    ) -> anyhow::Result<(vk::DescriptorSetLayout, Vec<vk::DescriptorPoolSize>, u32)> {
         let binding_flags_inner = [
             vk::DescriptorBindingFlags::empty(),
             vk::DescriptorBindingFlags::empty(),
@@ -387,14 +397,25 @@ impl RaytraceRenderer {
             ..Default::default()
         };
 
-        unsafe {
-            Ok(self
-                .device
-                .create_descriptor_set_layout(&create_info, None)?)
+        let layout = unsafe {
+            self.device
+                .create_descriptor_set_layout(&create_info, None)?
+        };
+
+        let mut descriptor_sizes = Vec::new();
+        for binding in bindings {
+            descriptor_sizes.push(vk::DescriptorPoolSize {
+                ty: binding.descriptor_type,
+                descriptor_count: binding.descriptor_count,
+            });
         }
+
+        Ok((layout, descriptor_sizes, MeshScene::MAX_LIGHTS))
     }
 
-    fn get_per_object_descriptor_set_layout(&self) -> anyhow::Result<vk::DescriptorSetLayout> {
+    fn get_per_object_descriptor_set_layout(
+        &self,
+    ) -> anyhow::Result<(vk::DescriptorSetLayout, Vec<vk::DescriptorPoolSize>, u32)> {
         let binding_flags_inner = [vk::DescriptorBindingFlags::VARIABLE_DESCRIPTOR_COUNT
             | vk::DescriptorBindingFlags::PARTIALLY_BOUND];
 
@@ -419,11 +440,20 @@ impl RaytraceRenderer {
             ..Default::default()
         };
 
-        unsafe {
-            Ok(self
-                .device
-                .create_descriptor_set_layout(&create_info, None)?)
+        let layout = unsafe {
+            self.device
+                .create_descriptor_set_layout(&create_info, None)?
+        };
+
+        let mut descriptor_sizes = Vec::new();
+        for binding in bindings {
+            descriptor_sizes.push(vk::DescriptorPoolSize {
+                ty: binding.descriptor_type,
+                descriptor_count: binding.descriptor_count,
+            });
         }
+
+        Ok((layout, descriptor_sizes, MeshScene::MAX_OBJECTS))
     }
 
     fn create_pipeline(
@@ -636,6 +666,8 @@ impl RaytraceRenderer {
                 .queue_submit(self.compute_queue, &[submit_info], vk::Fence::null())?;
 
             self.device.queue_wait_idle(self.compute_queue)?;
+            self.device
+                .free_command_buffers(self.command_pool, &[command_buffer]);
         }
 
         unsafe { staging_buffer.destroy(&self.device, allocator)? };
@@ -666,6 +698,144 @@ impl RaytraceRenderer {
             callable_region,
         ))
     }
+
+    fn create_descriptor_pool_and_set(
+        &self,
+        layout: vk::DescriptorSetLayout,
+        sizes: &[vk::DescriptorPoolSize],
+        bindless_count: u32,
+    ) -> anyhow::Result<(vk::DescriptorPool, vk::DescriptorSet)> {
+        let pool = {
+            let pool_info = vk::DescriptorPoolCreateInfo {
+                pool_size_count: sizes.len() as u32,
+                p_pool_sizes: sizes.as_ptr(),
+                max_sets: 1,
+                ..Default::default()
+            };
+
+            unsafe { self.device.create_descriptor_pool(&pool_info, None) }?
+        };
+
+        let set = unsafe {
+            let mut allocate_info = vk::DescriptorSetAllocateInfo {
+                descriptor_pool: pool,
+                p_set_layouts: &raw const layout,
+                descriptor_set_count: 1,
+                ..Default::default()
+            };
+            if bindless_count > 0 {
+                let count_allocate_info = vk::DescriptorSetVariableDescriptorCountAllocateInfo {
+                    descriptor_set_count: 1,
+                    p_descriptor_counts: &raw const bindless_count,
+                    ..Default::default()
+                };
+                allocate_info.p_next = &raw const count_allocate_info as *const std::ffi::c_void;
+            }
+            self.device.allocate_descriptor_sets(&allocate_info)?[0]
+        };
+
+        Ok((pool, set))
+    }
+
+    fn create_storage_image(
+        &self,
+        window_data: &WindowData,
+        allocator: &mut Allocator,
+    ) -> anyhow::Result<(vk::Image, Allocation)> {
+        let image_create_info = vk::ImageCreateInfo {
+            image_type: vk::ImageType::TYPE_2D,
+            format: vk::Format::R8G8B8A8_SRGB,
+            extent: vk::Extent3D {
+                width: window_data.image_extent.width,
+                height: window_data.image_extent.height,
+                depth: 1,
+            },
+            mip_levels: 1,
+            array_layers: 1,
+            samples: vk::SampleCountFlags::TYPE_1,
+            tiling: vk::ImageTiling::OPTIMAL,
+            usage: vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC,
+            sharing_mode: vk::SharingMode::EXCLUSIVE,
+            ..Default::default()
+        };
+
+        let image = unsafe { self.device.create_image(&image_create_info, None)? };
+
+        let memory_req = unsafe { self.device.get_image_memory_requirements(image) };
+        let image_allocation = allocator.allocate(&AllocationCreateDesc {
+            name: "storage image",
+            requirements: memory_req,
+            location: MemoryLocation::GpuOnly,
+            linear: false,
+            allocation_scheme: AllocationScheme::GpuAllocatorManaged,
+        })?;
+
+        unsafe {
+            self.device.bind_image_memory(
+                image,
+                image_allocation.memory(),
+                image_allocation.offset(),
+            )?;
+        }
+
+        let command_buffer = {
+            let allocate_info = vk::CommandBufferAllocateInfo {
+                command_buffer_count: 1,
+                command_pool: self.command_pool,
+                level: vk::CommandBufferLevel::PRIMARY,
+                ..Default::default()
+            };
+
+            unsafe { self.device.allocate_command_buffers(&allocate_info)?[0] }
+        };
+
+        let image_barrier = vk::ImageMemoryBarrier {
+            src_access_mask: vk::AccessFlags::empty(),
+            dst_access_mask: vk::AccessFlags::empty(),
+            old_layout: vk::ImageLayout::UNDEFINED,
+            new_layout: vk::ImageLayout::GENERAL,
+            image,
+            subresource_range: vk::ImageSubresourceRange {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            },
+            ..Default::default()
+        };
+
+        unsafe {
+            self.device.cmd_pipeline_barrier(
+                command_buffer,
+                vk::PipelineStageFlags::ALL_COMMANDS,
+                vk::PipelineStageFlags::ALL_COMMANDS,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[image_barrier],
+            );
+
+            self.device.end_command_buffer(command_buffer)?;
+        }
+
+        let submit_info = vk::SubmitInfo {
+            command_buffer_count: 1,
+            p_command_buffers: &raw const command_buffer,
+            ..Default::default()
+        };
+
+        unsafe {
+            self.device
+                .queue_submit(self.compute_queue, &[submit_info], vk::Fence::null())?;
+
+            self.device.queue_wait_idle(self.compute_queue)?;
+            self.device
+                .free_command_buffers(self.command_pool, &[command_buffer]);
+        }
+
+        Ok((image, image_allocation))
+    }
 }
 
 impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
@@ -675,6 +845,8 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
         device: &Device,
         physical_device: vk::PhysicalDevice,
         queue_family_info: &QueueFamilyInfo,
+        target: &WindowData,
+        allocator: &mut Allocator,
     ) -> anyhow::Result<Self> {
         let accel_struct_device = khr::acceleration_structure::Device::new(instance, device);
         let rt_pipeline_device = khr::ray_tracing_pipeline::Device::new(instance, device);
@@ -703,7 +875,7 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
         };
         let compute_queue = unsafe { device.get_device_queue(compute_queue_index, 0) };
 
-        Ok(RaytraceRenderer {
+        let mut out = RaytraceRenderer {
             device: device.clone(),
             accel_struct_device,
             rt_pipeline_device,
@@ -724,7 +896,20 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             miss_region: Default::default(),
             hit_region: Default::default(),
             callable_region: Default::default(),
-        })
+            global_descriptor_pool: Default::default(),
+            offsets_descriptor_pool: Default::default(),
+            brdf_params_descriptor_pool: Default::default(),
+            global_descriptor_set: Default::default(),
+            offsets_descriptor_set: Default::default(),
+            brdf_params_descriptor_set: Default::default(),
+            storage_image: Default::default(),
+            storage_image_allocation: Default::default(),
+        };
+
+        (out.storage_image, out.storage_image_allocation) =
+            out.create_storage_image(target, allocator)?;
+
+        Ok(out)
     }
 
     fn ingest_scene(&mut self, scene: &MeshScene, allocator: &mut Allocator) -> anyhow::Result<()> {
@@ -753,9 +938,15 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             (top_as[0], Some(top_as_buffer.remove(0)))
         };
 
-        let global_descriptor_set_layout = self.get_global_descriptor_set_layout()?;
-        let offsets_descriptor_set_layout = self.get_per_object_descriptor_set_layout()?;
-        let brdf_params_descriptor_set_layout = self.get_per_object_descriptor_set_layout()?;
+        let (global_descriptor_set_layout, global_descriptor_sizes, global_bindless_count) =
+            self.get_global_descriptor_set_layout()?;
+        let (offsets_descriptor_set_layout, offsets_descriptor_sizes, offsets_bindless_count) =
+            self.get_per_object_descriptor_set_layout()?;
+        let (
+            brdf_params_descriptor_set_layout,
+            brdf_params_descriptor_sizes,
+            brdf_params_bindless_count,
+        ) = self.get_per_object_descriptor_set_layout()?;
 
         let shader_group_count: usize;
         (self.pipeline_layout, self.pipeline, shader_group_count) = self.create_pipeline(
@@ -776,6 +967,37 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             self.callable_region,
         ) = self.create_sbt(shader_group_count, allocator)?;
         self.sbt_buffer = Some(sbt_buffer);
+
+        (self.global_descriptor_pool, self.global_descriptor_set) = self
+            .create_descriptor_pool_and_set(
+                global_descriptor_set_layout,
+                &global_descriptor_sizes,
+                global_bindless_count,
+            )?;
+        (self.offsets_descriptor_pool, self.offsets_descriptor_set) = self
+            .create_descriptor_pool_and_set(
+                offsets_descriptor_set_layout,
+                &offsets_descriptor_sizes,
+                offsets_bindless_count,
+            )?;
+        (
+            self.brdf_params_descriptor_pool,
+            self.brdf_params_descriptor_set,
+        ) = self.create_descriptor_pool_and_set(
+            brdf_params_descriptor_set_layout,
+            &brdf_params_descriptor_sizes,
+            brdf_params_bindless_count,
+        )?;
+
+        let accel_info = vk::WriteDescriptorSetAccelerationStructureKHR {
+            acceleration_structure_count: 1,
+            p_acceleration_structures: &raw const self.top_as,
+            ..Default::default()
+        };
+        // let accel_write = vk::WriteDescriptorSet {
+        //     dst_set: self.global_descriptor_set,
+
+        // }
 
         Ok(())
     }
