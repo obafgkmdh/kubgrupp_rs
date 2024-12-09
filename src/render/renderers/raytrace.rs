@@ -118,7 +118,6 @@ impl RaytraceRenderer {
             }?;
             build_info.dst_acceleration_structure = accel_struct;
 
-            println!("scratch buffer!!!");
             let scratch_buffer = AllocatedBuffer::new_with_alignment(
                 &self.device,
                 allocator,
@@ -726,10 +725,10 @@ impl RaytraceRenderer {
 
     fn create_storage_image(
         &self,
-        window_data: &WindowData,
+        width: u32,
+        height: u32,
         allocator: &mut Allocator,
     ) -> anyhow::Result<(vk::Image, vk::ImageView, Allocation)> {
-        let (width, height) = window_data.get_size();
         let image_create_info = vk::ImageCreateInfo {
             image_type: vk::ImageType::TYPE_2D,
             format: vk::Format::R8G8B8A8_UNORM,
@@ -1083,11 +1082,13 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             camera_data: [0; 128],
         };
 
+        let (width, height) = target.get_size();
+
         (
             out.storage_image,
             out.storage_image_view,
             out.storage_image_allocation,
-        ) = out.create_storage_image(target, allocator)?;
+        ) = out.create_storage_image(width, height, allocator)?;
 
         Ok(out)
     }
@@ -1162,6 +1163,7 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
         });
 
         let mut light_data = Vec::<u8>::new();
+        light_data.extend_from_slice(bytemuck::cast_slice(&[scene.lights.len() as u32]));
         for light in scene.lights.iter() {
             if let Light::Point { color, position } = light {
                 light_data.extend_from_slice(bytemuck::cast_slice(&[0u32]));
@@ -1287,6 +1289,9 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
                     let view_inverse_cols = view.inverse().to_cols_array();
                     let view_bytes: &[u8] = bytemuck::cast_slice(&view_inverse_cols);
                     self.camera_data[0..64].copy_from_slice(&view_bytes);
+                }
+                MeshSceneUpdate::NewSize((width, height)) => {
+                    //self.
                 }
                 _ => (),
             }

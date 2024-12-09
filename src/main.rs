@@ -1,7 +1,6 @@
 use std::ffi::{c_char, c_void, CStr};
 use std::fs::File;
 use std::ptr;
-use std::sync::Arc;
 
 use anyhow::Result;
 use ash::vk::{
@@ -17,7 +16,7 @@ use ash::{
 use debug::DebugUtilsData;
 use defer::Defer;
 use env_logger::Builder;
-use glam::{Mat3, Mat4, Vec3, Vec4};
+use glam::{Mat3, Mat4, Vec3};
 use gpu_allocator::vulkan::{Allocator, AllocatorCreateDesc};
 use log::{debug, warn, LevelFilter};
 use render::renderers::RaytraceRenderer;
@@ -28,7 +27,7 @@ use utils::{query_queue_families, QueueFamilyInfo};
 use window::WindowData;
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
-use winit::event::{DeviceEvent, DeviceId, KeyEvent, RawKeyEvent, WindowEvent};
+use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::{Key, KeyCode, PhysicalKey};
 use winit::platform::modifier_supplement::KeyEventExtModifierSupplement;
@@ -75,6 +74,7 @@ struct MeshApp<R> {
     d_down: bool,
     shift_down: bool,
     space_down: bool,
+    pending_resize: Option<(u32, u32)>,
 }
 
 impl<R> MeshApp<R>
@@ -150,6 +150,7 @@ where
             d_down: false,
             shift_down: false,
             space_down: false,
+            pending_resize: None,
         })
     }
 
@@ -503,6 +504,9 @@ where
                     _ => (),
                 }
             }
+            WindowEvent::Resized(PhysicalSize { width, height }) => {
+                self.pending_resize = Some((width, height));
+            }
             WindowEvent::RedrawRequested => {
                 const SPEED: f32 = 0.005f32;
                 let horiz_dir: Vec3 =
@@ -533,7 +537,7 @@ where
                     self.view_updated = true;
                 }
 
-                let updates = if self.view_updated {
+                let mut updates = if self.view_updated {
                     vec![MeshSceneUpdate::NewView(Mat4::look_to_lh(
                         self.position,
                         self.direction,
@@ -542,6 +546,10 @@ where
                 } else {
                     vec![]
                 };
+
+                if let Some((w, h)) = self.pending_resize {
+                    updates.push(MeshSceneUpdate::NewSize((w, h)));
+                }
 
                 self.renderer
                     .as_mut()

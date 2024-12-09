@@ -12,6 +12,7 @@
 layout(location = 0) rayPayloadInEXT RayPayload ray_info;
 
 layout(scalar, set = 0, binding = 3) readonly buffer Lights {
+    uint num_lights;
     Light lights[];
 } lights;
 

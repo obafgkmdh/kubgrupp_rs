@@ -17,7 +17,6 @@ pub struct WindowData {
     surface_loader: khr::surface::Instance,
     device: Device,
 
-    image_format: vk::Format,
     image_extent: vk::Extent2D,
     images: Vec<vk::Image>,
     current_image: u32,
@@ -47,7 +46,7 @@ impl WindowData {
         let surface_loader = khr::surface::Instance::new(vk_lib, instance);
         let surface = surface.defer(|x| unsafe { surface_loader.destroy_surface(*x, None) });
 
-        let (swapchain, image_format, image_extent, images) =
+        let (swapchain, image_extent, images) =
             Self::create_swapchain(vk_lib, instance, device, physical_device, *surface, &window)?;
 
         let (image_semaphores, render_semaphores, flight_fences) =
@@ -61,7 +60,6 @@ impl WindowData {
             surface,
             window,
             device: device.clone(),
-            image_format,
             image_extent,
             images,
             current_image: 0,
@@ -172,7 +170,7 @@ impl WindowData {
         physical_device: vk::PhysicalDevice,
         surface: vk::SurfaceKHR,
         window: &Window,
-    ) -> Result<(vk::SwapchainKHR, vk::Format, vk::Extent2D, Vec<vk::Image>)> {
+    ) -> Result<(vk::SwapchainKHR, vk::Extent2D, Vec<vk::Image>)> {
         let swapchain_loader = khr::swapchain::Device::new(instance, device);
 
         let support_details =
@@ -227,7 +225,7 @@ impl WindowData {
 
         let images = unsafe { swapchain_loader.get_swapchain_images(swapchain) }?;
 
-        Ok((swapchain, surface_format.format, image_extent, images))
+        Ok((swapchain, image_extent, images))
     }
 
     fn choose_surface_format(formats: &[vk::SurfaceFormatKHR]) -> vk::SurfaceFormatKHR {

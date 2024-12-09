@@ -99,8 +99,7 @@ struct Shaders {
 #[derive(Debug)]
 pub enum MeshSceneUpdate {
     NewView(Mat4),
-    NewAspectRatio(f32),
-    NewFovDegrees(f32),
+    NewSize((u32, u32)),
 }
 
 impl Scene for MeshScene {
