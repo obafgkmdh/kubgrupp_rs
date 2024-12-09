@@ -554,7 +554,11 @@ where
                 self.renderer
                     .as_mut()
                     .unwrap()
-                    .render_to(&updates, self.window.as_mut().unwrap())
+                    .render_to(
+                        &updates,
+                        self.window.as_mut().unwrap(),
+                        self.allocator.as_mut().unwrap(),
+                    )
                     .expect("failed to render to target");
 
                 self.view_updated = false;

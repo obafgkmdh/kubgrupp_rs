@@ -444,8 +444,8 @@ impl RaytraceRenderer {
                 .create_pipeline_layout(&layout_create_info, None)?
         };
 
-        let raygen_module = scene.raygen_shader.clone().compile(&self.device)?.module();
-        let miss_module = scene.miss_shader.clone().compile(&self.device)?.module();
+        let raygen_module = scene.raygen_shader.compile(&self.device)?.module();
+        let miss_module = scene.miss_shader.compile(&self.device)?.module();
         let mut shader_stages = vec![
             vk::PipelineShaderStageCreateInfo {
                 stage: vk::ShaderStageFlags::RAYGEN_KHR,
@@ -1282,6 +1282,7 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
         &mut self,
         updates: &[<MeshScene as Scene>::Update],
         target: &mut WindowData,
+        allocator: &mut Allocator,
     ) -> anyhow::Result<()> {
         for update in updates {
             match update {
@@ -1290,10 +1291,35 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
                     let view_bytes: &[u8] = bytemuck::cast_slice(&view_inverse_cols);
                     self.camera_data[0..64].copy_from_slice(&view_bytes);
                 }
-                MeshSceneUpdate::NewSize((width, height)) => {
-                    //self.
-                }
-                _ => (),
+                MeshSceneUpdate::NewSize((width, height)) => unsafe {
+                    self.device.device_wait_idle()?;
+                    self.device
+                        .destroy_image_view(self.storage_image_view, None);
+                    self.device.destroy_image(self.storage_image, None);
+
+                    let mut allocation: Allocation;
+                    (self.storage_image, self.storage_image_view, allocation) =
+                        self.create_storage_image(*width, *height, allocator)?;
+                    std::mem::swap(&mut allocation, &mut self.storage_image_allocation);
+                    allocator.free(allocation)?;
+
+                    let image_info = vk::DescriptorImageInfo {
+                        image_layout: vk::ImageLayout::GENERAL,
+                        image_view: self.storage_image_view,
+                        sampler: vk::Sampler::null(),
+                    };
+                    let image_write = vk::WriteDescriptorSet {
+                        dst_set: self.descriptor_set,
+                        dst_binding: 0,
+                        dst_array_element: 0,
+                        descriptor_type: vk::DescriptorType::STORAGE_IMAGE,
+                        descriptor_count: 1,
+                        p_image_info: &raw const image_info,
+                        ..Default::default()
+                    };
+
+                    self.device.update_descriptor_sets(&[image_write], &[]);
+                },
             }
         }
 
