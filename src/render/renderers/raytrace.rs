@@ -2,7 +2,6 @@ use std::{ffi::c_char, sync::LazyLock, u64};
 
 use anyhow::anyhow;
 use ash::{khr, vk, Device, Entry, Instance};
-use glam::Vec3;
 use gpu_allocator::{vulkan::*, MemoryLocation};
 use tobj::Model;
 
@@ -23,6 +22,7 @@ pub struct RaytraceRenderer {
     rt_pipeline_device: khr::ray_tracing_pipeline::Device,
     device_properties: vk::PhysicalDeviceProperties,
     rt_pipeline_properties: vk::PhysicalDeviceRayTracingPipelinePropertiesKHR<'static>,
+    accel_properties: vk::PhysicalDeviceAccelerationStructurePropertiesKHR<'static>,
     command_pool: vk::CommandPool,
     compute_queue: vk::Queue,
     mesh_buffers: Vec<(AllocatedBuffer, AllocatedBuffer)>,
@@ -119,7 +119,7 @@ impl RaytraceRenderer {
             build_info.dst_acceleration_structure = accel_struct;
 
             println!("scratch buffer!!!");
-            let scratch_buffer = AllocatedBuffer::new(
+            let scratch_buffer = AllocatedBuffer::new_with_alignment(
                 &self.device,
                 allocator,
                 size_info.build_scratch_size,
@@ -128,6 +128,8 @@ impl RaytraceRenderer {
                     | vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
                 MemoryLocation::GpuOnly,
                 self.device_properties.limits,
+                0, // self.accel_properties
+                   //     .min_acceleration_structure_scratch_offset_alignment,
             )?;
 
             build_info.scratch_data = vk::DeviceOrHostAddressKHR {
@@ -1025,10 +1027,10 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
 
         let mut rt_pipeline_properties =
             vk::PhysicalDeviceRayTracingPipelinePropertiesKHR::default();
-        let mut physical_device_properties2 = vk::PhysicalDeviceProperties2 {
-            p_next: &raw mut rt_pipeline_properties as *mut std::ffi::c_void,
-            ..Default::default()
-        };
+        let mut accel_properties = vk::PhysicalDeviceAccelerationStructurePropertiesKHR::default();
+        let mut physical_device_properties2 = vk::PhysicalDeviceProperties2::default()
+            .push_next(&mut rt_pipeline_properties)
+            .push_next(&mut accel_properties);
         unsafe {
             instance
                 .get_physical_device_properties2(physical_device, &mut physical_device_properties2)
@@ -1054,6 +1056,7 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             rt_pipeline_device,
             device_properties: physical_device_properties2.properties,
             rt_pipeline_properties,
+            accel_properties,
             command_pool,
             compute_queue,
             mesh_buffers: Default::default(),

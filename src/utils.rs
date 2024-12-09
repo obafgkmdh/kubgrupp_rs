@@ -65,6 +65,18 @@ impl AllocatedBuffer {
         location: MemoryLocation,
         limits: vk::PhysicalDeviceLimits,
     ) -> Result<AllocatedBuffer> {
+        Self::new_with_alignment(device, allocator, size, usage, location, limits, 0)
+    }
+
+    pub fn new_with_alignment(
+        device: &Device,
+        allocator: &mut Allocator,
+        size: vk::DeviceSize,
+        usage: vk::BufferUsageFlags,
+        location: MemoryLocation,
+        limits: vk::PhysicalDeviceLimits,
+        alignment: u32,
+    ) -> Result<AllocatedBuffer> {
         unsafe {
             let buffer_info = vk::BufferCreateInfo {
                 size,
@@ -75,8 +87,10 @@ impl AllocatedBuffer {
 
             let buffer = device.create_buffer(&buffer_info, None)?;
 
-            let memory_req = device.get_buffer_memory_requirements(buffer);
-            println!("{}", memory_req.alignment);
+            let mut memory_req = device.get_buffer_memory_requirements(buffer);
+            if alignment > 0 {
+                memory_req.alignment = align_up(memory_req.alignment as u32, alignment) as u64;
+            }
 
             let allocation = allocator.allocate(&AllocationCreateDesc {
                 name: "buffer",
