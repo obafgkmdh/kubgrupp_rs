@@ -16,20 +16,21 @@ use ash::{
 use debug::DebugUtilsData;
 use defer::Defer;
 use env_logger::Builder;
+use glam::Mat4;
 use gpu_allocator::vulkan::{Allocator, AllocatorCreateDesc};
 use log::{debug, warn, LevelFilter};
 use render::renderers::RaytraceRenderer;
 use render::Renderer;
-use scene::scenes::mesh::MeshScene;
+use scene::scenes::mesh::{Camera, MeshScene};
 use scene::Scene;
 use utils::{query_queue_families, QueueFamilyInfo};
 use window::WindowData;
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
-use winit::event::WindowEvent;
+use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
-use winit::window::{WindowAttributes, WindowId};
+use winit::window::{CursorGrabMode, WindowAttributes, WindowId};
 
 mod debug;
 mod defer;
@@ -49,7 +50,7 @@ const DEBUG_MODE: bool = false;
 
 const APPLICATION_NAME: &'static str = concat!(env!("CARGO_PKG_NAME"), "\0");
 
-struct App<S, R> {
+struct MeshApp<R> {
     // WARNING: ORDER MATTERS HERE!!!
     // fields are dropped from top to bottom (not bottom to top like C++)
     // make sure to also update the Drop impl when adding fields
@@ -61,15 +62,15 @@ struct App<S, R> {
     device: Option<Device>,
     instance: Instance,
     vk_lib: Entry,
-    scene: S,
+    scene: MeshScene,
+    view_update: Option<Mat4>,
 }
 
-impl<S, R> App<S, R>
+impl<R> MeshApp<R>
 where
-    S: Scene,
-    R: Renderer<S, WindowData>,
+    R: Renderer<MeshScene, WindowData>,
 {
-    pub fn new(event_loop: &EventLoop<()>, scene: S, debug_mode: bool) -> Result<Self> {
+    pub fn new(event_loop: &EventLoop<()>, scene: MeshScene, debug_mode: bool) -> Result<Self> {
         let vk_lib = unsafe { Entry::load().expect("failed to load Vulkan library") };
 
         let enable_vk_debug = debug_mode && Self::is_vk_debug_supported(&vk_lib)?;
@@ -116,7 +117,7 @@ where
             })
             .transpose()?;
 
-        Ok(App {
+        Ok(MeshApp {
             renderer: None,
             window: None,
             allocator: None,
@@ -126,6 +127,7 @@ where
             instance: instance.undefer(),
             vk_lib,
             scene,
+            view_update: None,
         })
     }
 
@@ -305,7 +307,7 @@ where
     }
 }
 
-impl<S, R> Drop for App<S, R> {
+impl<R> Drop for MeshApp<R> {
     fn drop(&mut self) {
         drop(self.renderer.take());
         drop(self.window.take());
@@ -317,10 +319,10 @@ impl<S, R> Drop for App<S, R> {
     }
 }
 
-impl<S, R> ApplicationHandler for App<S, R>
+impl<R> ApplicationHandler for MeshApp<R>
 where
-    S: Scene,
-    R: Renderer<S, WindowData>,
+    R: Renderer<MeshScene, WindowData>,
+    MeshScene: Scene,
 {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         debug!("App resuming...");
@@ -331,9 +333,15 @@ where
                 .create_window(
                     WindowAttributes::default()
                         .with_inner_size(PhysicalSize::new(800, 800))
-                        .with_title("kubgrupp")
+                        .with_title("kubgrupp"),
                 )
                 .unwrap();
+            window
+                .set_cursor_grab(CursorGrabMode::Confined)
+                .or_else(|_e| window.set_cursor_grab(CursorGrabMode::Locked))
+                .expect("could not confine cursor");
+            window.set_cursor_visible(false);
+
             let display_handle = window.display_handle().unwrap();
             let window_handle = window.window_handle().unwrap();
             let surface = unsafe {
@@ -439,6 +447,11 @@ where
                 debug!("Closing window...");
                 event_loop.exit();
             }
+            WindowEvent::KeyboardInput {
+                device_id,
+                event,
+                is_synthetic,
+            } => {}
             WindowEvent::RedrawRequested => {
                 self.renderer
                     .as_mut()
@@ -446,7 +459,31 @@ where
                     .render_to(&[], self.window.as_mut().unwrap())
                     .expect("failed to render to target");
 
+                self.view_update = None;
+
                 self.window.as_ref().unwrap().request_redraw();
+            }
+            _ => (),
+        }
+    }
+
+    fn device_event(
+        &mut self,
+        _event_loop: &ActiveEventLoop,
+        _device_id: DeviceId,
+        event: DeviceEvent,
+    ) {
+        match event {
+            DeviceEvent::MouseMotion { delta: (dx, dy) } => {
+                let view_update = if let Some(update) = self.view_update {
+                    update
+                } else {
+                    self.scene.camera.view
+                };
+
+                let rotation = Mat4::from_euler(glam::EulerRot::XYZ, dx as f32, dy as f32, 0f32);
+
+                self.view_update = Some(rotation * view_update);
             }
             _ => (),
         }
@@ -463,7 +500,6 @@ fn main() {
 
     let file = File::open("resources/scenes/cubes.toml").expect("scene file does not exist");
     let scene = MeshScene::load_from(file).expect("scene could not be loaded");
-    let mut app: App<MeshScene, RaytraceRenderer> =
-        App::new(&event_loop, scene, DEBUG_MODE).unwrap();
+    let mut app: MeshApp<RaytraceRenderer> = MeshApp::new(&event_loop, scene, DEBUG_MODE).unwrap();
     event_loop.run_app(&mut app).unwrap();
 }

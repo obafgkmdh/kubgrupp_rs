@@ -14,7 +14,7 @@ struct BrdfParams {
     vec3 albedo;
 };
 
-layout(scalar, set = 0, binding = 6) readonly buffer Fields {
+layout(scalar, set = 0, binding = 5) readonly buffer Fields {
     BrdfParams params[];
 } instance_info;
 

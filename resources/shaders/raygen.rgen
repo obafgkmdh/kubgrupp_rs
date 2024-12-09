@@ -11,8 +11,7 @@ layout(location = 0) rayPayloadEXT RayPayload ray_info;
 
 layout(set = 0, binding = 0) writeonly uniform image2D image;
 layout(set = 0, binding = 1) uniform accelerationStructureEXT topLevelAS;
-layout(set = 0, binding = 2) uniform pushConstants {
-    mat4 viewProj;
+layout(push_constant) uniform Cameras {
     mat4 viewInverse;
     mat4 projInverse;
 };

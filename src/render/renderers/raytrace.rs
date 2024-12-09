@@ -42,12 +42,12 @@ pub struct RaytraceRenderer {
     storage_image: vk::Image,
     storage_image_view: vk::ImageView,
     storage_image_allocation: Allocation,
-    camera_buffer: Option<AllocatedBuffer>,
     vertex_normal_buffer: Option<AllocatedBuffer>,
     light_buffer: Option<AllocatedBuffer>,
     offset_buffer: Option<AllocatedBuffer>,
     brdf_param_buffer: Option<AllocatedBuffer>,
     command_buffers: Vec<vk::CommandBuffer>,
+    camera_data: [u8; 128],
 }
 
 impl RaytraceRenderer {
@@ -362,22 +362,13 @@ impl RaytraceRenderer {
                 binding: 1,
                 ..Default::default()
             },
-            // camera
-            vk::DescriptorSetLayoutBinding {
-                descriptor_count: 1,
-                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                stage_flags: vk::ShaderStageFlags::RAYGEN_KHR
-                    | vk::ShaderStageFlags::CLOSEST_HIT_KHR,
-                binding: 2,
-                ..Default::default()
-            },
             // vertices and normals
             vk::DescriptorSetLayoutBinding {
                 descriptor_count: 1,
                 descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
                 stage_flags: vk::ShaderStageFlags::RAYGEN_KHR
                     | vk::ShaderStageFlags::CLOSEST_HIT_KHR,
-                binding: 3,
+                binding: 2,
                 ..Default::default()
             },
             // lights
@@ -385,7 +376,7 @@ impl RaytraceRenderer {
                 descriptor_count: 1,
                 descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
                 stage_flags: vk::ShaderStageFlags::CLOSEST_HIT_KHR,
-                binding: 4,
+                binding: 3,
                 ..Default::default()
             },
             // offsets
@@ -393,7 +384,7 @@ impl RaytraceRenderer {
                 descriptor_count: 1,
                 descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
                 stage_flags: vk::ShaderStageFlags::CLOSEST_HIT_KHR,
-                binding: 5,
+                binding: 4,
                 ..Default::default()
             },
             // brdf params
@@ -401,7 +392,7 @@ impl RaytraceRenderer {
                 descriptor_count: 1,
                 descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
                 stage_flags: vk::ShaderStageFlags::CLOSEST_HIT_KHR,
-                binding: 6,
+                binding: 5,
                 ..Default::default()
             },
         ];
@@ -433,9 +424,16 @@ impl RaytraceRenderer {
         scene: &MeshScene,
         descriptor_set_layouts: &[vk::DescriptorSetLayout],
     ) -> anyhow::Result<(vk::PipelineLayout, vk::Pipeline, usize)> {
+        let push_constant_range = vk::PushConstantRange {
+            stage_flags: vk::ShaderStageFlags::RAYGEN_KHR,
+            offset: 0,
+            size: 128,
+        };
         let layout_create_info = vk::PipelineLayoutCreateInfo {
             p_set_layouts: descriptor_set_layouts.as_ptr(),
             set_layout_count: descriptor_set_layouts.len() as u32,
+            push_constant_range_count: 1,
+            p_push_constant_ranges: &raw const push_constant_range,
             ..Default::default()
         };
         let pipeline_layout = unsafe {
@@ -889,6 +887,14 @@ impl RaytraceRenderer {
                     &[],
                 );
 
+                self.device.cmd_push_constants(
+                    command_buffer,
+                    self.pipeline_layout,
+                    vk::ShaderStageFlags::RAYGEN_KHR,
+                    0,
+                    &self.camera_data,
+                );
+
                 self.rt_pipeline_device.cmd_trace_rays(
                     command_buffer,
                     &self.raygen_region,
@@ -1065,12 +1071,12 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             storage_image: Default::default(),
             storage_image_view: Default::default(),
             storage_image_allocation: Default::default(),
-            camera_buffer: Default::default(),
             vertex_normal_buffer: Default::default(),
             light_buffer: Default::default(),
             offset_buffer: Default::default(),
             brdf_param_buffer: Default::default(),
             command_buffers: Default::default(),
+            camera_data: [0; 128],
         };
 
         (
@@ -1169,45 +1175,28 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             self.create_device_buffer(&light_data, vk::BufferUsageFlags::STORAGE_BUFFER, allocator)?
         });
 
-        let offset_data: Vec<_> = scene.objects.iter().map(|x| x.brdf_params_index).collect();
-
         self.offset_buffer = Some(unsafe {
             self.create_device_buffer(
-                &offset_data,
+                &scene.offset_buf,
                 vk::BufferUsageFlags::STORAGE_BUFFER,
                 allocator,
             )?
         });
 
-        let brdf_param_data: Vec<_> = scene
-            .objects
-            .iter()
-            .flat_map(|x| &x.brdf_params)
-            .map(|&x| x)
-            .collect();
         self.brdf_param_buffer = Some(unsafe {
             self.create_device_buffer(
-                &brdf_param_data,
+                &scene.brdf_buf,
                 vk::BufferUsageFlags::STORAGE_BUFFER,
                 allocator,
             )?
         });
 
-        let mut camera_data = Vec::new();
-        let view_proj = scene.camera.perspective * scene.camera.view;
-        let view_inverse = scene.camera.view.inverse();
-        let proj_inverse = scene.camera.perspective.inverse();
-        camera_data.extend(view_proj.to_cols_array());
-        camera_data.extend(view_inverse.to_cols_array());
-        camera_data.extend(proj_inverse.to_cols_array());
-
-        self.camera_buffer = Some(unsafe {
-            self.create_device_buffer(
-                &camera_data,
-                vk::BufferUsageFlags::UNIFORM_BUFFER,
-                allocator,
-            )?
-        });
+        let view_inverse_cols = scene.camera.view.inverse().to_cols_array();
+        let proj_inverse_cols = scene.camera.perspective.inverse().to_cols_array();
+        let view_bytes: &[u8] = bytemuck::cast_slice(&view_inverse_cols);
+        let proj_bytes: &[u8] = bytemuck::cast_slice(&proj_inverse_cols);
+        self.camera_data[0..64].copy_from_slice(&view_bytes);
+        self.camera_data[64..128].copy_from_slice(&proj_bytes);
 
         let mut writes = Vec::new();
 
@@ -1241,21 +1230,6 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             ..Default::default()
         });
 
-        let camera_info = vk::DescriptorBufferInfo {
-            buffer: self.camera_buffer.as_ref().unwrap().buffer,
-            range: vk::WHOLE_SIZE,
-            offset: 0,
-        };
-        writes.push(vk::WriteDescriptorSet {
-            dst_set: self.descriptor_set,
-            dst_binding: 2,
-            dst_array_element: 0,
-            descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-            descriptor_count: 1,
-            p_buffer_info: &raw const camera_info,
-            ..Default::default()
-        });
-
         let mut buffer_infos = Vec::new();
 
         for (i, buf) in [
@@ -1274,7 +1248,7 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             });
             writes.push(vk::WriteDescriptorSet {
                 dst_set: self.descriptor_set,
-                dst_binding: i as u32 + 3,
+                dst_binding: i as u32 + 2,
                 dst_array_element: 0,
                 descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
                 descriptor_count: 1,
@@ -1292,9 +1266,11 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
 
     fn render_to(
         &mut self,
-        _updates: &[<MeshScene as Scene>::Update],
+        updates: &[<MeshScene as Scene>::Update],
         target: &mut WindowData,
     ) -> anyhow::Result<()> {
+        //for update in updates {}
+
         if self.command_buffers.is_empty() {
             self.command_buffers =
                 self.create_command_buffer(target.get_images(), target.get_size())?;

@@ -247,20 +247,24 @@ impl MeshScene {
         let mut data = Vec::new();
         let mut indices = Vec::new();
         for (array, param_size) in arrays.iter().zip(param_sizes) {
-            let current_size = data.len();
-            let padding = if current_size % param_size != 0 {
-                param_size - (current_size % param_size)
+            if param_size == 0 {
+                indices.push(0);
             } else {
-                0
-            };
+                let current_size = data.len();
+                let padding = if current_size % param_size != 0 {
+                    param_size - (current_size % param_size)
+                } else {
+                    0
+                };
 
-            data.extend(iter::repeat(0).take(padding));
-            assert!(data.len() % param_size == 0);
+                data.extend(iter::repeat(0).take(padding));
+                assert!(data.len() % param_size == 0);
 
-            let start_index = data.len() / param_size;
-            indices.push(start_index);
+                let start_index = data.len() / param_size;
+                indices.push(start_index);
 
-            data.extend_from_slice(array);
+                data.extend_from_slice(array);
+            }
         }
 
         // create offset buffer
@@ -347,7 +351,6 @@ impl MeshScene {
                 brdf_params: datas,
                 alignment: 4, // TODO: dont hardcode this (sue me)
                 vertex_index,
-                brdf_params_index,
             })
         }
 
@@ -683,7 +686,6 @@ impl MeshScene {
                         brdf_params: Vec::new(),
                         alignment: 1,
                         vertex_index: start_idx as u32, // vertex index is actually light index
-                        brdf_params_index: 0, // this will be ignored by the emitter hit shader (color is in light info)
                     });
                 }
                 _ => bail!("unknown light type"),

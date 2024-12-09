@@ -21,11 +21,11 @@ struct Light {
     vec3 vertices[3];
 };
 
-layout(scalar, set = 0, binding = 4) readonly buffer Lights {
+layout(scalar, set = 0, binding = 3) readonly buffer Lights {
     Light lights[];
 } lights;
 
-layout(scalar, set = 0, binding = 6) readonly buffer Fields {
+layout(scalar, set = 0, binding = 5) readonly buffer Fields {
     BrdfParams params[];
 } instance_info;
 
