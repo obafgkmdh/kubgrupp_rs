@@ -1,6 +1,8 @@
+use std::cell::RefCell;
 use std::ffi::{c_char, c_void, CStr};
 use std::fs::File;
 use std::ptr;
+use std::rc::Rc;
 
 use anyhow::Result;
 use ash::vk::{
@@ -57,7 +59,7 @@ struct MeshApp<R> {
     // make sure to also update the Drop impl when adding fields
     renderer: Option<R>,
     window: Option<WindowData>,
-    allocator: Option<Allocator>,
+    allocator: Option<Rc<RefCell<Allocator>>>,
     debug_data: Option<DebugUtilsData>,
     physical_device: Option<vk::PhysicalDevice>,
     device: Option<Device>,
@@ -102,7 +104,7 @@ where
         });
 
         let validation_feature_enable = [
-            vk::ValidationFeatureEnableEXT::DEBUG_PRINTF,
+            // vk::ValidationFeatureEnableEXT::DEBUG_PRINTF,
             vk::ValidationFeatureEnableEXT::SYNCHRONIZATION_VALIDATION,
             vk::ValidationFeatureEnableEXT::BEST_PRACTICES,
         ];
@@ -333,9 +335,12 @@ impl<R> Drop for MeshApp<R> {
     fn drop(&mut self) {
         drop(self.renderer.take());
         drop(self.window.take());
-        self.device
-            .take()
-            .map(|x| unsafe { x.destroy_device(None) });
+        drop(self.allocator.take());
+        if let Some(device) = self.device.take() {
+            unsafe {
+                device.destroy_device(None);
+            }
+        }
         drop(self.debug_data.take());
         unsafe { self.instance.destroy_instance(None) };
     }
@@ -400,6 +405,7 @@ where
             let physical_device = self
                 .pick_physical_device(valid_devices)
                 .expect("failed to find compatible physical device");
+            self.physical_device = Some(physical_device);
 
             let queue_family_info =
                 query_queue_families(&self.vk_lib, &self.instance, physical_device, *surface)
@@ -407,8 +413,9 @@ where
             let device = self
                 .create_device(physical_device, &queue_family_info)
                 .expect("failed to create device");
+            self.device = Some(device.clone());
 
-            self.allocator = Some(
+            self.allocator = Some(Rc::new(RefCell::new(
                 Allocator::new(&AllocatorCreateDesc {
                     instance: self.instance.clone(),
                     device: device.clone(),
@@ -418,7 +425,7 @@ where
                     allocation_sizes: Default::default(),
                 })
                 .expect("failed to create allocator"),
-            );
+            )));
 
             self.window = Some(
                 WindowData::new(
@@ -433,8 +440,6 @@ where
             );
             surface.undefer();
 
-            self.physical_device = Some(physical_device);
-            self.device = Some(device.clone());
             self.renderer = Some(
                 R::new(
                     &self.vk_lib,
@@ -443,7 +448,7 @@ where
                     physical_device,
                     &queue_family_info,
                     self.window.as_ref().unwrap(),
-                    self.allocator.as_mut().unwrap(),
+                    self.allocator.as_mut().unwrap().clone(),
                 )
                 .expect("failed to create renderer"),
             );
@@ -453,7 +458,7 @@ where
             self.renderer
                 .as_mut()
                 .unwrap()
-                .ingest_scene(&self.scene, self.allocator.as_mut().unwrap())
+                .ingest_scene(&self.scene)
                 .expect("failed to ingest scene");
         }
     }
@@ -537,11 +542,7 @@ where
                 self.renderer
                     .as_mut()
                     .unwrap()
-                    .render_to(
-                        &updates,
-                        self.window.as_mut().unwrap(),
-                        self.allocator.as_mut().unwrap(),
-                    )
+                    .render_to(&updates, self.window.as_mut().unwrap())
                     .expect("failed to render to target");
 
                 self.view_updated = false;
@@ -565,8 +566,7 @@ where
             let rx = (dx / sx as f64) as f32;
             let ry = (dy / sy as f64) as f32;
 
-            let rot_x =
-                Mat3::from_axis_angle(rx_axis, rx);
+            let rot_x = Mat3::from_axis_angle(rx_axis, rx);
             let rot_y = Mat3::from_axis_angle(ry_axis.normalize(), ry);
 
             let new_direction = rot_x * rot_y * self.direction;

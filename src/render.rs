@@ -1,4 +1,4 @@
-use std::ffi::c_char;
+use std::{cell::RefCell, ffi::c_char, rc::Rc};
 
 use crate::{features::VkFeatureGuard, scene::Scene, utils::QueueFamilyInfo};
 use ash::{vk, Device, Entry, Instance};
@@ -20,15 +20,14 @@ where
         physical_device: vk::PhysicalDevice,
         queue_family_info: &QueueFamilyInfo,
         target: &Target,
-        allocator: &mut Allocator,
+        allocator: Rc<RefCell<Allocator>>,
     ) -> anyhow::Result<Self>;
 
-    fn ingest_scene(&mut self, scene: &S, allocator: &mut Allocator) -> anyhow::Result<()>;
+    fn ingest_scene(&mut self, scene: &S) -> anyhow::Result<()>;
     fn render_to(
         &mut self,
         updates: &[S::Update],
         target: &mut Target,
-        allocator: &mut Allocator,
     ) -> anyhow::Result<()>;
 
     fn required_instance_extensions() -> &'static [*const c_char];

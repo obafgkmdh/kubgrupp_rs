@@ -135,9 +135,8 @@ impl AllocatedBuffer {
         device.get_buffer_device_address(&buffer_device_address_info)
     }
 
-    pub unsafe fn destroy(self, device: &Device, allocator: &mut Allocator) -> Result<()> {
+    pub unsafe fn destroy(self, device: &Device, allocator: &mut Allocator) {
         device.destroy_buffer(self.buffer, None);
-        allocator.free(self.allocation)?;
-        Ok(())
+        allocator.free(self.allocation).unwrap();
     }
 }

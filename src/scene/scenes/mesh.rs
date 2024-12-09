@@ -655,7 +655,7 @@ impl MeshScene {
                             .ok_or(anyhow!("no transform field provided"))?,
                     )?;
 
-                    let mesh_name = Self::get_string(&light_conf, "mesh")?;
+                    let mesh_name = Self::get_string(light_conf, "mesh")?;
                     let mesh_i = *mesh_map
                         .get(mesh_name)
                         .ok_or(anyhow!("no such mesh: {}", mesh_name))?

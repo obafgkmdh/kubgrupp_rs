@@ -1,4 +1,4 @@
-use std::{ffi::c_char, sync::LazyLock};
+use std::{cell::RefCell, ffi::c_char, rc::Rc, sync::LazyLock};
 
 use anyhow::anyhow;
 use ash::{khr, vk, Device, Entry, Instance};
@@ -17,6 +17,7 @@ use crate::{
 };
 
 pub struct RaytraceRenderer {
+    allocator: Rc<RefCell<Allocator>>,
     device: Device,
     accel_struct_device: khr::acceleration_structure::Device,
     rt_pipeline_device: khr::ray_tracing_pipeline::Device,
@@ -25,8 +26,6 @@ pub struct RaytraceRenderer {
     accel_properties: vk::PhysicalDeviceAccelerationStructurePropertiesKHR<'static>,
     command_pool: vk::CommandPool,
     compute_queue: vk::Queue,
-    mesh_buffers: Vec<(AllocatedBuffer, AllocatedBuffer)>,
-    instance_buffer: Option<AllocatedBuffer>,
     top_as: vk::AccelerationStructureKHR,
     top_as_buffer: Option<AllocatedBuffer>,
     bottom_ass: Vec<vk::AccelerationStructureKHR>,
@@ -40,10 +39,11 @@ pub struct RaytraceRenderer {
     callable_region: vk::StridedDeviceAddressRegionKHR,
     descriptor_pool: vk::DescriptorPool,
     descriptor_set: vk::DescriptorSet,
+    descriptor_set_layout: vk::DescriptorSetLayout,
     storage_image: vk::Image,
     storage_image_size: (u32, u32),
     storage_image_view: vk::ImageView,
-    storage_image_allocation: Allocation,
+    storage_image_allocation: Option<Allocation>,
     vertex_normal_buffer: Option<AllocatedBuffer>,
     light_buffer: Option<AllocatedBuffer>,
     offset_buffer: Option<AllocatedBuffer>,
@@ -58,7 +58,6 @@ impl RaytraceRenderer {
         ty: vk::AccelerationStructureTypeKHR,
         geometries: &[vk::AccelerationStructureGeometryKHR],
         primitive_counts: &[u32],
-        allocator: &mut Allocator,
     ) -> anyhow::Result<(Vec<vk::AccelerationStructureKHR>, Vec<AllocatedBuffer>)> {
         let mut build_infos = Vec::new();
         let mut build_range_infos = Vec::new();
@@ -97,7 +96,7 @@ impl RaytraceRenderer {
 
             let buffer = AllocatedBuffer::new(
                 &self.device,
-                allocator,
+                &mut self.allocator.borrow_mut(),
                 size_info.acceleration_structure_size,
                 vk::BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR
                     | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
@@ -121,7 +120,7 @@ impl RaytraceRenderer {
 
             let scratch_buffer = AllocatedBuffer::new_with_alignment(
                 &self.device,
-                allocator,
+                &mut self.allocator.borrow_mut(),
                 size_info.build_scratch_size,
                 vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS | vk::BufferUsageFlags::STORAGE_BUFFER,
                 MemoryLocation::GpuOnly,
@@ -187,7 +186,7 @@ impl RaytraceRenderer {
                 .free_command_buffers(self.command_pool, &[build_command_buffer]);
 
             for scratch_buffer in scratch_buffers {
-                scratch_buffer.destroy(&self.device, allocator)?;
+                scratch_buffer.destroy(&self.device, &mut self.allocator.borrow_mut());
             }
         }
 
@@ -197,7 +196,6 @@ impl RaytraceRenderer {
     fn get_mesh_geometries(
         &self,
         meshes: &[Model],
-        allocator: &mut Allocator,
     ) -> anyhow::Result<(
         Vec<vk::AccelerationStructureGeometryKHR<'static>>,
         Vec<(AllocatedBuffer, AllocatedBuffer)>,
@@ -212,7 +210,7 @@ impl RaytraceRenderer {
 
             let mut vertex_buffer = AllocatedBuffer::new(
                 &self.device,
-                allocator,
+                &mut self.allocator.borrow_mut(),
                 (vertex_stride * vertex_count) as vk::DeviceSize,
                 vk::BufferUsageFlags::VERTEX_BUFFER
                     | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
@@ -227,7 +225,7 @@ impl RaytraceRenderer {
 
             let mut index_buffer = AllocatedBuffer::new(
                 &self.device,
-                allocator,
+                &mut self.allocator.borrow_mut(),
                 (index_stride * index_count) as vk::DeviceSize,
                 vk::BufferUsageFlags::INDEX_BUFFER
                     | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
@@ -272,7 +270,6 @@ impl RaytraceRenderer {
         &self,
         objects: &[Object],
         bottom_accel_structs: &[vk::AccelerationStructureKHR],
-        allocator: &mut Allocator,
     ) -> anyhow::Result<(
         vk::AccelerationStructureGeometryKHR<'static>,
         AllocatedBuffer,
@@ -319,7 +316,7 @@ impl RaytraceRenderer {
         let instance_buffer_size = std::mem::size_of_val(&instances[0]) * instances.len();
         let mut instance_buffer = AllocatedBuffer::new(
             &self.device,
-            allocator,
+            &mut self.allocator.borrow_mut(),
             instance_buffer_size as vk::DeviceSize,
             vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
                 | vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
@@ -443,6 +440,8 @@ impl RaytraceRenderer {
                 .create_pipeline_layout(&layout_create_info, None)?
         };
 
+        let mut shaders = Vec::new();
+
         let raygen_module = scene.raygen_shader.compile(&self.device)?.module();
         let miss_module = scene.miss_shader.compile(&self.device)?.module();
         let mut shader_stages = vec![
@@ -459,6 +458,8 @@ impl RaytraceRenderer {
                 ..Default::default()
             },
         ];
+        shaders.push(raygen_module);
+        shaders.push(miss_module);
         let mut shader_groups = vec![
             vk::RayTracingShaderGroupCreateInfoKHR {
                 ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,
@@ -486,6 +487,7 @@ impl RaytraceRenderer {
                 p_name: c"main".as_ptr(),
                 ..Default::default()
             });
+            shaders.push(module);
             shader_groups.push(vk::RayTracingShaderGroupCreateInfoKHR {
                 ty: vk::RayTracingShaderGroupTypeKHR::TRIANGLES_HIT_GROUP,
                 general_shader: vk::SHADER_UNUSED_KHR,
@@ -518,6 +520,12 @@ impl RaytraceRenderer {
                     .ok_or(anyhow!("failed to construct pipeline: {y}"))?,
             }
         };
+
+        for shader in shaders {
+            unsafe {
+                self.device.destroy_shader_module(shader, None);
+            }
+        }
 
         Ok((pipeline_layout, pipeline, shader_groups.len()))
     }
@@ -580,12 +588,11 @@ impl RaytraceRenderer {
         &self,
         data: &[T],
         usage: vk::BufferUsageFlags,
-        allocator: &mut Allocator,
     ) -> anyhow::Result<AllocatedBuffer> {
         let size = std::mem::size_of_val(data) as u64;
         let mut staging_buffer = AllocatedBuffer::new(
             &self.device,
-            allocator,
+            &mut self.allocator.borrow_mut(),
             size,
             vk::BufferUsageFlags::TRANSFER_SRC,
             MemoryLocation::CpuToGpu,
@@ -595,7 +602,7 @@ impl RaytraceRenderer {
 
         let buffer = AllocatedBuffer::new(
             &self.device,
-            allocator,
+            &mut self.allocator.borrow_mut(),
             size,
             usage | vk::BufferUsageFlags::TRANSFER_DST,
             MemoryLocation::GpuOnly,
@@ -604,7 +611,7 @@ impl RaytraceRenderer {
 
         self.copy_buffer(staging_buffer.buffer, buffer.buffer, size)?;
 
-        staging_buffer.destroy(&self.device, allocator)?;
+        staging_buffer.destroy(&self.device, &mut self.allocator.borrow_mut());
 
         Ok(buffer)
     }
@@ -612,7 +619,6 @@ impl RaytraceRenderer {
     fn create_sbt(
         &self,
         shader_group_count: usize,
-        allocator: &mut Allocator,
     ) -> anyhow::Result<(
         AllocatedBuffer,
         vk::StridedDeviceAddressRegionKHR,
@@ -662,7 +668,6 @@ impl RaytraceRenderer {
                 &table_data,
                 vk::BufferUsageFlags::SHADER_BINDING_TABLE_KHR
                     | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
-                allocator,
             )?
         };
 
@@ -726,7 +731,6 @@ impl RaytraceRenderer {
         &self,
         width: u32,
         height: u32,
-        allocator: &mut Allocator,
     ) -> anyhow::Result<(vk::Image, vk::ImageView, Allocation)> {
         let image_create_info = vk::ImageCreateInfo {
             image_type: vk::ImageType::TYPE_2D,
@@ -748,13 +752,16 @@ impl RaytraceRenderer {
         let image = unsafe { self.device.create_image(&image_create_info, None)? };
 
         let memory_req = unsafe { self.device.get_image_memory_requirements(image) };
-        let image_allocation = allocator.allocate(&AllocationCreateDesc {
-            name: "storage image",
-            requirements: memory_req,
-            location: MemoryLocation::GpuOnly,
-            linear: false,
-            allocation_scheme: AllocationScheme::GpuAllocatorManaged,
-        })?;
+        let image_allocation = self
+            .allocator
+            .borrow_mut()
+            .allocate(&AllocationCreateDesc {
+                name: "storage image",
+                requirements: memory_req,
+                location: MemoryLocation::GpuOnly,
+                linear: false,
+                allocation_scheme: AllocationScheme::GpuAllocatorManaged,
+            })?;
 
         unsafe {
             self.device.bind_image_memory(
@@ -1016,7 +1023,7 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
         physical_device: vk::PhysicalDevice,
         queue_family_info: &QueueFamilyInfo,
         target: &WindowData,
-        allocator: &mut Allocator,
+        allocator: Rc<RefCell<Allocator>>,
     ) -> anyhow::Result<Self> {
         let accel_struct_device = khr::acceleration_structure::Device::new(instance, device);
         let rt_pipeline_device = khr::ray_tracing_pipeline::Device::new(instance, device);
@@ -1046,8 +1053,8 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
         };
         let compute_queue = unsafe { device.get_device_queue(compute_queue_index, 0) };
 
-        let (image_width, image_height) = target.get_size();
-        let mut out = RaytraceRenderer {
+        Ok(RaytraceRenderer {
+            allocator,
             device: device.clone(),
             accel_struct_device,
             rt_pipeline_device,
@@ -1056,8 +1063,6 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             accel_properties,
             command_pool,
             compute_queue,
-            mesh_buffers: Default::default(),
-            instance_buffer: Default::default(),
             top_as: Default::default(),
             top_as_buffer: Default::default(),
             bottom_ass: Default::default(),
@@ -1071,8 +1076,9 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             callable_region: Default::default(),
             descriptor_pool: Default::default(),
             descriptor_set: Default::default(),
+            descriptor_set_layout: Default::default(),
             storage_image: Default::default(),
-            storage_image_size: (image_width, image_height),
+            storage_image_size: target.get_size(),
             storage_image_view: Default::default(),
             storage_image_allocation: Default::default(),
             vertex_normal_buffer: Default::default(),
@@ -1081,48 +1087,54 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             brdf_param_buffer: Default::default(),
             command_buffers: Default::default(),
             camera_data: [0; 128],
-        };
-
-        (
-            out.storage_image,
-            out.storage_image_view,
-            out.storage_image_allocation,
-        ) = out.create_storage_image(image_width, image_height, allocator)?;
-
-        Ok(out)
+        })
     }
 
-    fn ingest_scene(&mut self, scene: &MeshScene, allocator: &mut Allocator) -> anyhow::Result<()> {
+    fn ingest_scene(&mut self, scene: &MeshScene) -> anyhow::Result<()> {
+        let storage_image_allocation: Allocation;
+        (
+            self.storage_image,
+            self.storage_image_view,
+            storage_image_allocation,
+        ) = self.create_storage_image(self.storage_image_size.0, self.storage_image_size.1)?;
+        self.storage_image_allocation = Some(storage_image_allocation);
+
         let (mesh_geometries, mesh_buffers, mesh_primitive_counts) =
-            self.get_mesh_geometries(&scene.meshes, allocator)?;
-        self.mesh_buffers = mesh_buffers;
+            self.get_mesh_geometries(&scene.meshes)?;
 
         (self.bottom_ass, self.bottom_as_buffers) = self.build_accel_structs(
             vk::AccelerationStructureTypeKHR::BOTTOM_LEVEL,
             &mesh_geometries,
             &mesh_primitive_counts,
-            allocator,
         )?;
+        for (vbuf, ibuf) in mesh_buffers {
+            unsafe {
+                vbuf.destroy(&self.device, &mut self.allocator.borrow_mut());
+                ibuf.destroy(&self.device, &mut self.allocator.borrow_mut());
+            }
+        }
 
         let (instance_geometry, instance_buffer, instance_count) =
-            self.get_instance_geometry(&scene.objects, &self.bottom_ass, allocator)?;
-        self.instance_buffer = Some(instance_buffer);
+            self.get_instance_geometry(&scene.objects, &self.bottom_ass)?;
 
         (self.top_as, self.top_as_buffer) = {
             let (top_as, mut top_as_buffer) = self.build_accel_structs(
                 vk::AccelerationStructureTypeKHR::TOP_LEVEL,
                 &[instance_geometry],
                 &[instance_count],
-                allocator,
             )?;
             (top_as[0], Some(top_as_buffer.remove(0)))
         };
+        unsafe {
+            instance_buffer.destroy(&self.device, &mut self.allocator.borrow_mut());
+        }
 
-        let (descriptor_set_layout, descriptor_sizes) = self.get_descriptor_set_layout()?;
+        let descriptor_sizes: Vec<vk::DescriptorPoolSize>;
+        (self.descriptor_set_layout, descriptor_sizes) = self.get_descriptor_set_layout()?;
 
         let shader_group_count: usize;
         (self.pipeline_layout, self.pipeline, shader_group_count) =
-            self.create_pipeline(scene, &[descriptor_set_layout])?;
+            self.create_pipeline(scene, &[self.descriptor_set_layout])?;
 
         let sbt_buffer: AllocatedBuffer;
         (
@@ -1131,11 +1143,11 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             self.miss_region,
             self.hit_region,
             self.callable_region,
-        ) = self.create_sbt(shader_group_count, allocator)?;
+        ) = self.create_sbt(shader_group_count)?;
         self.sbt_buffer = Some(sbt_buffer);
 
         (self.descriptor_pool, self.descriptor_set) =
-            self.create_descriptor_pool_and_set(descriptor_set_layout, &descriptor_sizes)?;
+            self.create_descriptor_pool_and_set(self.descriptor_set_layout, &descriptor_sizes)?;
 
         let vertex_normal_data: Vec<f32> = scene
             .meshes
@@ -1154,11 +1166,7 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             .collect();
 
         self.vertex_normal_buffer = Some(unsafe {
-            self.create_device_buffer(
-                &vertex_normal_data,
-                vk::BufferUsageFlags::STORAGE_BUFFER,
-                allocator,
-            )?
+            self.create_device_buffer(&vertex_normal_data, vk::BufferUsageFlags::STORAGE_BUFFER)?
         });
 
         let mut light_data = Vec::<u8>::new();
@@ -1180,24 +1188,16 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
         }
 
         self.light_buffer = Some(unsafe {
-            self.create_device_buffer(&light_data, vk::BufferUsageFlags::STORAGE_BUFFER, allocator)?
+            self.create_device_buffer(&light_data, vk::BufferUsageFlags::STORAGE_BUFFER)?
         });
 
         self.offset_buffer = Some(unsafe {
-            self.create_device_buffer(
-                &scene.offset_buf,
-                vk::BufferUsageFlags::STORAGE_BUFFER,
-                allocator,
-            )?
+            self.create_device_buffer(&scene.offset_buf, vk::BufferUsageFlags::STORAGE_BUFFER)?
         });
 
         if !scene.brdf_buf.is_empty() {
             self.brdf_param_buffer = Some(unsafe {
-                self.create_device_buffer(
-                    &scene.brdf_buf,
-                    vk::BufferUsageFlags::STORAGE_BUFFER,
-                    allocator,
-                )?
+                self.create_device_buffer(&scene.brdf_buf, vk::BufferUsageFlags::STORAGE_BUFFER)?
             });
         }
 
@@ -1281,14 +1281,13 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
         &mut self,
         updates: &[<MeshScene as Scene>::Update],
         target: &mut WindowData,
-        allocator: &mut Allocator,
     ) -> anyhow::Result<()> {
         for update in updates {
             match update {
                 MeshSceneUpdate::NewView(view) => {
                     let view_inverse_cols = view.inverse().to_cols_array();
                     let view_bytes: &[u8] = bytemuck::cast_slice(&view_inverse_cols);
-                    self.camera_data[0..64].copy_from_slice(&view_bytes);
+                    self.camera_data[0..64].copy_from_slice(view_bytes);
                 }
                 MeshSceneUpdate::NewSize((width, height, projection)) => unsafe {
                     self.device.device_wait_idle()?;
@@ -1296,11 +1295,13 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
                         .destroy_image_view(self.storage_image_view, None);
                     self.device.destroy_image(self.storage_image, None);
 
-                    let mut allocation: Allocation;
+                    let allocation: Allocation;
                     (self.storage_image, self.storage_image_view, allocation) =
-                        self.create_storage_image(*width, *height, allocator)?;
-                    std::mem::swap(&mut allocation, &mut self.storage_image_allocation);
-                    allocator.free(allocation)?;
+                        self.create_storage_image(*width, *height)?;
+                    self.allocator
+                        .borrow_mut()
+                        .free(self.storage_image_allocation.take().unwrap())?;
+                    self.storage_image_allocation = Some(allocation);
 
                     self.storage_image_size = (*width, *height);
 
@@ -1414,5 +1415,67 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
         };
 
         vec![create_info]
+    }
+}
+
+impl Drop for RaytraceRenderer {
+    fn drop(&mut self) {
+        unsafe {
+            self.device
+                .device_wait_idle()
+                .expect("failed to wait for device idle");
+
+            self.device.destroy_command_pool(self.command_pool, None);
+
+            self.device
+                .destroy_descriptor_pool(self.descriptor_pool, None);
+            if let Some(x) = self.sbt_buffer.take() {
+                x.destroy(&self.device, &mut self.allocator.borrow_mut());
+            }
+            self.device.destroy_pipeline(self.pipeline, None);
+            self.device
+                .destroy_descriptor_set_layout(self.descriptor_set_layout, None);
+
+            self.device
+                .destroy_pipeline_layout(self.pipeline_layout, None);
+
+            for bottom_as in self.bottom_ass.iter() {
+                self.accel_struct_device
+                    .destroy_acceleration_structure(*bottom_as, None);
+            }
+            while !self.bottom_as_buffers.is_empty() {
+                self.bottom_as_buffers
+                    .swap_remove(0)
+                    .destroy(&self.device, &mut self.allocator.borrow_mut());
+            }
+            self.accel_struct_device
+                .destroy_acceleration_structure(self.top_as, None);
+            if let Some(x) = self.top_as_buffer.take() {
+                x.destroy(&self.device, &mut self.allocator.borrow_mut());
+            }
+
+            self.device
+                .destroy_image_view(self.storage_image_view, None);
+            self.device.destroy_image(self.storage_image, None);
+            if let Some(x) = self.storage_image_allocation.take() {
+                self.allocator.borrow_mut().free(x).unwrap();
+            }
+
+            if let Some(x) = self.vertex_normal_buffer.take() {
+                x.destroy(&self.device, &mut self.allocator.borrow_mut());
+            }
+
+            if let Some(x) = self.light_buffer.take() {
+                x.destroy(&self.device, &mut self.allocator.borrow_mut());
+            }
+
+            if let Some(x) = self.offset_buffer.take() {
+                x.destroy(&self.device, &mut self.allocator.borrow_mut());
+            }
+
+            if let Some(x) = self.brdf_param_buffer.take() {
+                x.destroy(&self.device, &mut self.allocator.borrow_mut());
+            }
+        }
     }
 }

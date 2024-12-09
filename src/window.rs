@@ -307,6 +307,11 @@ impl Drop for WindowData {
             self.device
                 .device_wait_idle()
                 .expect("failed to wait for device idle");
+            for i in 0..self.flight_fences.len() {
+                self.device.destroy_fence(self.flight_fences[i], None);
+                self.device.destroy_semaphore(self.image_semaphores[i], None);
+                self.device.destroy_semaphore(self.render_semaphores[i], None);
+            }
             self.swapchain_loader
                 .destroy_swapchain(self.swapchain, None);
             self.surface_loader.destroy_surface(self.surface, None);
