@@ -128,8 +128,8 @@ impl RaytraceRenderer {
                     | vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
                 MemoryLocation::GpuOnly,
                 self.device_properties.limits,
-                0, // self.accel_properties
-                   //     .min_acceleration_structure_scratch_offset_alignment,
+                self.accel_properties
+                    .min_acceleration_structure_scratch_offset_alignment,
             )?;
 
             build_info.scratch_data = vk::DeviceOrHostAddressKHR {
