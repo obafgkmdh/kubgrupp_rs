@@ -19,7 +19,7 @@ impl<T, F: FnMut(&T)> Deref for Deferred<T, F> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner.as_ref().unwrap()
+        self.inner.as_ref().unwrap()
     }
 }
 

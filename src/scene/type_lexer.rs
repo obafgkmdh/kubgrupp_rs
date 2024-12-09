@@ -10,7 +10,7 @@ pub enum Token<'a> {
     LexerError(anyhow::Error),
 }
 
-impl<'a> PartialEq for Token<'a> {
+impl PartialEq for Token<'_> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Typename(l0), Self::Typename(r0)) => l0 == r0,
@@ -47,15 +47,15 @@ impl<'a> Iterator for TokenIter<'a> {
         let mut chars = remaining.chars();
         Some(match chars.next().unwrap() {
             '[' => {
-                self.remaining = &chars.as_str().trim_start();
+                self.remaining = chars.as_str().trim_start();
                 Token::LSqBracket
             }
             ']' => {
-                self.remaining = &chars.as_str().trim_start();
+                self.remaining = chars.as_str().trim_start();
                 Token::RSqBracket
             }
             ';' => {
-                self.remaining = &chars.as_str().trim_start();
+                self.remaining = chars.as_str().trim_start();
                 Token::Semicolon
             }
             c if c.is_ascii_alphabetic() => {

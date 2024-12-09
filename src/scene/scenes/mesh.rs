@@ -217,26 +217,26 @@ impl MeshScene {
         })
     }
 
-    fn get_field<'a, 'b>(conf: &'a Table, field: &'b str) -> Result<&'a Value> {
+    fn get_field<'a>(conf: &'a Table, field: &str) -> Result<&'a Value> {
         conf.get(field)
             .ok_or(anyhow!("field {} not provided", field))
     }
 
-    fn get_array<'a, 'b>(conf: &'a Table, field: &'b str) -> Result<&'a Vec<Value>> {
+    fn get_array<'a>(conf: &'a Table, field: &str) -> Result<&'a Vec<Value>> {
         match Self::get_field(conf, field)? {
             Value::Array(vals) => Ok(vals),
             _ => Err(anyhow!("field {} must be an array", field)),
         }
     }
 
-    fn get_string<'a, 'b>(conf: &'a Table, field: &'b str) -> Result<&'a String> {
+    fn get_string<'a>(conf: &'a Table, field: &str) -> Result<&'a String> {
         match Self::get_field(conf, field)? {
             Value::String(str) => Ok(str),
             _ => Err(anyhow!("field {} must be an array", field)),
         }
     }
 
-    fn get_table<'a, 'b>(conf: &'a Table, field: &'b str) -> Result<&'a Map<String, Value>> {
+    fn get_table<'a>(conf: &'a Table, field: &str) -> Result<&'a Map<String, Value>> {
         match Self::get_field(conf, field)? {
             Value::Table(table) => Ok(table),
             _ => Err(anyhow!("field {} must be an array", field)),
@@ -298,7 +298,7 @@ impl MeshScene {
         conf: &Table,
         mesh_map: &HashMap<String, u32>,
         meshes: &[Model],
-        shaders: &Vec<Shader>,
+        shaders: &[Shader],
         type_map: &HashMap<String, Vec<ShaderType>>,
     ) -> Result<Vec<Object>> {
         // get primitive start offsets of meshes
@@ -864,7 +864,7 @@ impl MeshScene {
         Self::parse_type(&mut tokens)
     }
 
-    fn parse_type<'a>(tokens: &mut Peekable<TokenIter<'a>>) -> Result<ShaderType> {
+    fn parse_type(tokens: &mut Peekable<TokenIter<'_>>) -> Result<ShaderType> {
         let lookahead = tokens
             .peek()
             .ok_or(anyhow!("incomplete type - no tokens remaining"))?;
@@ -888,7 +888,7 @@ impl MeshScene {
         Ok(parsed_type)
     }
 
-    fn parse_array<'a>(tokens: &mut Peekable<TokenIter<'a>>) -> Result<ShaderType> {
+    fn parse_array(tokens: &mut Peekable<TokenIter<'_>>) -> Result<ShaderType> {
         if !matches!(
             tokens.next().ok_or(anyhow!("no next token"))?,
             Token::LSqBracket
@@ -919,7 +919,7 @@ impl MeshScene {
         Ok(ShaderType::Array(Box::new(parsed_type), array_size))
     }
 
-    fn parse_simple_type<'a>(tokens: &mut Peekable<TokenIter<'a>>) -> Result<ShaderType> {
+    fn parse_simple_type(tokens: &mut Peekable<TokenIter<'_>>) -> Result<ShaderType> {
         let the_token = tokens.next().ok_or(anyhow!("no next token"))?;
         let Token::Typename(typename) = the_token else {
             bail!("token was not a typename: {:?}", the_token)

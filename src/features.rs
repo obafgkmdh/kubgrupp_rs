@@ -158,14 +158,11 @@ impl<'a> VkFeatureGuard<'a> {
         // this is due to invariant that first layout is *always* vk::PhysicalDeviceFeatures2
         assert!(!head.is_null());
 
-        VkFeatureGuard {
-            head,
-            parent: parent,
-        }
+        VkFeatureGuard { head, parent }
     }
 
     /// Gets an immutable reference to the underlying `PhysicalDeviceFeatures2` struct
-    pub fn get(&self) -> &vk::PhysicalDeviceFeatures2<'a> {
+    pub fn get(&self) -> &vk::PhysicalDeviceFeatures2 {
         unsafe { &*self.head }
     }
 
@@ -202,7 +199,7 @@ impl<'a> VkFeatureGuard<'a> {
     }
 }
 
-impl<'a> Clone for VkFeatureGuard<'a> {
+impl Clone for VkFeatureGuard<'_> {
     fn clone(&self) -> Self {
         // initializing new from scratch is fine since we have invariant that user cannot modify anything in the chain
         // therefore all features in the set (and only those features) should be set in this clone
@@ -210,7 +207,7 @@ impl<'a> Clone for VkFeatureGuard<'a> {
     }
 }
 
-impl<'a> Drop for VkFeatureGuard<'a> {
+impl Drop for VkFeatureGuard<'_> {
     fn drop(&mut self) {
         // iterate through p_next chain and drop everything
         let mut curr = self.head as *mut vk::BaseOutStructure;

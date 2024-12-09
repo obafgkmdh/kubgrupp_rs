@@ -1,4 +1,4 @@
-use std::{ffi::c_char, sync::LazyLock, u64};
+use std::{ffi::c_char, sync::LazyLock};
 
 use anyhow::anyhow;
 use ash::{khr, vk, Device, Entry, Instance};
@@ -142,10 +142,8 @@ impl RaytraceRenderer {
             buffers.push(buffer);
         }
 
-        let unsqueezed_build_range_infos: Vec<_> = build_range_infos
-            .iter()
-            .map(|s| std::slice::from_ref(s))
-            .collect();
+        let unsqueezed_build_range_infos: Vec<_> =
+            build_range_infos.iter().map(std::slice::from_ref).collect();
 
         let build_command_buffer = {
             let allocate_info = vk::CommandBufferAllocateInfo {
@@ -516,7 +514,7 @@ impl RaytraceRenderer {
             match out {
                 Ok(x) => x[0],
                 Err((x, y)) => *x
-                    .get(0)
+                    .first()
                     .ok_or(anyhow!("failed to construct pipeline: {y}"))?,
             }
         };
@@ -1152,7 +1150,7 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
                     pos.iter().chain(normal)
                 })
             })
-            .map(|x| *x)
+            .copied()
             .collect();
 
         self.vertex_normal_buffer = Some(unsafe {
@@ -1207,8 +1205,8 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
         let proj_inverse_cols = scene.camera.perspective.inverse().to_cols_array();
         let view_bytes: &[u8] = bytemuck::cast_slice(&view_inverse_cols);
         let proj_bytes: &[u8] = bytemuck::cast_slice(&proj_inverse_cols);
-        self.camera_data[0..64].copy_from_slice(&view_bytes);
-        self.camera_data[64..128].copy_from_slice(&proj_bytes);
+        self.camera_data[0..64].copy_from_slice(view_bytes);
+        self.camera_data[64..128].copy_from_slice(proj_bytes);
 
         let mut writes = Vec::new();
 
@@ -1325,7 +1323,7 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
 
                     let projection_inverse_cols = projection.inverse().to_cols_array();
                     let projection_bytes: &[u8] = bytemuck::cast_slice(&projection_inverse_cols);
-                    self.camera_data[64..128].copy_from_slice(&projection_bytes);
+                    self.camera_data[64..128].copy_from_slice(projection_bytes);
                 },
             }
         }

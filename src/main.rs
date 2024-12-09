@@ -29,8 +29,7 @@ use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
-use winit::keyboard::{Key, KeyCode, PhysicalKey};
-use winit::platform::modifier_supplement::KeyEventExtModifierSupplement;
+use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::window::{CursorGrabMode, WindowAttributes, WindowId};
 
@@ -50,7 +49,7 @@ const DEBUG_MODE: bool = true;
 #[cfg(not(debug_assertions))]
 const DEBUG_MODE: bool = false;
 
-const APPLICATION_NAME: &'static str = concat!(env!("CARGO_PKG_NAME"), "\0");
+const APPLICATION_NAME: &str = concat!(env!("CARGO_PKG_NAME"), "\0");
 
 struct MeshApp<R> {
     // WARNING: ORDER MATTERS HERE!!!
@@ -474,36 +473,19 @@ where
                 device_id: _device_id,
                 event: input_event,
                 is_synthetic: _is_synthetic,
-            } => {
-                match input_event.physical_key {
-                    PhysicalKey::Code(KeyCode::KeyW) => {
-                        self.w_down = input_event.state.is_pressed()
-                    }
-                    PhysicalKey::Code(KeyCode::KeyA) => {
-                        self.a_down = input_event.state.is_pressed()
-                    }
-                    PhysicalKey::Code(KeyCode::KeyS) => {
-                        self.s_down = input_event.state.is_pressed()
-                    }
-                    PhysicalKey::Code(KeyCode::KeyD) => {
-                        self.d_down = input_event.state.is_pressed()
-                    }
-                    PhysicalKey::Code(KeyCode::ShiftLeft) => {
-                        self.shift_down = input_event.state.is_pressed()
-                    }
-                    PhysicalKey::Code(KeyCode::Space) => {
-                        self.space_down = input_event.state.is_pressed()
-                    }
-                    _ => (),
+            } => match input_event.physical_key {
+                PhysicalKey::Code(KeyCode::KeyW) => self.w_down = input_event.state.is_pressed(),
+                PhysicalKey::Code(KeyCode::KeyA) => self.a_down = input_event.state.is_pressed(),
+                PhysicalKey::Code(KeyCode::KeyS) => self.s_down = input_event.state.is_pressed(),
+                PhysicalKey::Code(KeyCode::KeyD) => self.d_down = input_event.state.is_pressed(),
+                PhysicalKey::Code(KeyCode::ShiftLeft) => {
+                    self.shift_down = input_event.state.is_pressed()
                 }
-                match input_event.key_without_modifiers().as_ref() {
-                    Key::Character("w") => {
-                        self.position += self.direction * 0.05f32;
-                        self.view_updated = true;
-                    }
-                    _ => (),
+                PhysicalKey::Code(KeyCode::Space) => {
+                    self.space_down = input_event.state.is_pressed()
                 }
-            }
+                _ => (),
+            },
             WindowEvent::Resized(PhysicalSize { width, height }) => {
                 self.pending_resize = Some((width, height));
             }
@@ -576,26 +558,23 @@ where
         _device_id: DeviceId,
         event: DeviceEvent,
     ) {
-        match event {
-            DeviceEvent::MouseMotion { delta: (dx, dy) } => {
-                let (sx, sy) = self.window.as_ref().unwrap().get_size();
-                let ry_axis = Vec3::new(-self.direction.y, self.direction.x, 0f32);
-                let rx_axis = Vec3::new(0f32, 0f32, 1f32);
-                let rx = (dx / sx as f64) as f32;
-                let ry = (dy / sy as f64) as f32;
+        if let DeviceEvent::MouseMotion { delta: (dx, dy) } = event {
+            let (sx, sy) = self.window.as_ref().unwrap().get_size();
+            let ry_axis = Vec3::new(-self.direction.y, self.direction.x, 0f32);
+            let rx_axis = Vec3::new(0f32, 0f32, 1f32);
+            let rx = (dx / sx as f64) as f32;
+            let ry = (dy / sy as f64) as f32;
 
-                let rotation = Mat3::from_axis_angle(rx_axis, rx)
-                    * Mat3::from_axis_angle(ry_axis.normalize(), ry);
+            let rotation =
+                Mat3::from_axis_angle(rx_axis, rx) * Mat3::from_axis_angle(ry_axis.normalize(), ry);
 
-                let new_direction = rotation * self.direction;
+            let new_direction = rotation * self.direction;
 
-                if new_direction.truncate().dot(self.direction.truncate()) >= 0f32 {
-                    self.direction = new_direction.normalize();
-                }
-
-                self.view_updated = true;
+            if new_direction.truncate().dot(self.direction.truncate()) >= 0f32 {
+                self.direction = new_direction.normalize();
             }
-            _ => (),
+
+            self.view_updated = true;
         }
     }
 }

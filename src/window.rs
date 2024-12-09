@@ -1,4 +1,4 @@
-use std::{ffi::c_char, ptr, u64};
+use std::{ffi::c_char, ptr};
 
 use anyhow::{anyhow, Result};
 use ash::{khr, vk, Device, Entry, Instance};
@@ -256,12 +256,10 @@ impl WindowData {
             let max_extent = capabilities.max_image_extent;
             let size = window.inner_size();
 
-            let actual_extent = vk::Extent2D {
+            vk::Extent2D {
                 width: size.width.clamp(min_extent.width, max_extent.width),
                 height: size.height.clamp(min_extent.height, max_extent.height),
-            };
-
-            actual_extent
+            }
         }
     }
 
