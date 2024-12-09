@@ -565,12 +565,15 @@ where
             let rx = (dx / sx as f64) as f32;
             let ry = (dy / sy as f64) as f32;
 
-            let rotation =
-                Mat3::from_axis_angle(rx_axis, rx) * Mat3::from_axis_angle(ry_axis.normalize(), ry);
+            let rot_x =
+                Mat3::from_axis_angle(rx_axis, rx);
+            let rot_y = Mat3::from_axis_angle(ry_axis.normalize(), ry);
 
-            let new_direction = rotation * self.direction;
+            let new_direction = rot_x * rot_y * self.direction;
 
-            if new_direction.truncate().dot(self.direction.truncate()) >= 0f32 {
+            if new_direction.truncate().dot(self.direction.truncate()) < 0f32 {
+                self.direction = (rot_x * self.direction).normalize();
+            } else {
                 self.direction = new_direction.normalize();
             }
 
