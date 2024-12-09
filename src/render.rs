@@ -24,11 +24,7 @@ where
     ) -> anyhow::Result<Self>;
 
     fn ingest_scene(&mut self, scene: &S) -> anyhow::Result<()>;
-    fn render_to(
-        &mut self,
-        updates: &[S::Update],
-        target: &mut Target,
-    ) -> anyhow::Result<()>;
+    fn render_to(&mut self, updates: &[S::Update], target: &mut Target) -> anyhow::Result<()>;
 
     fn required_instance_extensions() -> &'static [*const c_char];
     fn required_device_extensions() -> &'static [*const c_char];
