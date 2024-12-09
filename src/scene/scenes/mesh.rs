@@ -761,6 +761,11 @@ impl MeshScene {
                 continue;
             };
 
+            // ignore comments
+            if action.starts_with('#') {
+                continue;
+            }
+
             // match on action (omg thats a cinema term)
             match action {
                 "identity" => transform = Mat4::IDENTITY,
