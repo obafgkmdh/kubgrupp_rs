@@ -123,9 +123,7 @@ impl RaytraceRenderer {
                 &self.device,
                 allocator,
                 size_info.build_scratch_size,
-                vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
-                    | vk::BufferUsageFlags::STORAGE_BUFFER
-                    | vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
+                vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS | vk::BufferUsageFlags::STORAGE_BUFFER,
                 MemoryLocation::GpuOnly,
                 self.device_properties.limits,
                 self.accel_properties
