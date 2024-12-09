@@ -73,8 +73,7 @@ pub struct Object {
 
     // this is pretty much just the base of the mesh in the list of all vertices
     pub vertex_index: u32,
-    // this one is probably just going to be the same as gl_InstanceID
-    // but added flexibility is good in case we decide to change
+
     pub brdf_params_index: u32,
 }
 
@@ -92,7 +91,6 @@ enum ShaderType {
 struct Shaders {
     raygen: Shader,
     miss: Shader,
-    emitter_rchit: Shader,
     rchit: Vec<Shader>,
 }
 
@@ -116,14 +114,14 @@ impl Shader {
         *module
     }
 
-    pub fn name(&self) -> &CStr {
+    fn name(&self) -> &CStr {
         match self {
             Shader::Uncompiled(name, _) => name,
             Shader::Compiled(name, _) => name,
         }
     }
 
-    pub fn compile(self, device: &Device) -> Result<Self> {
+    pub fn compile(&self, device: &Device) -> Result<Self> {
         match self {
             Shader::Uncompiled(name, code) => {
                 let create_info = vk::ShaderModuleCreateInfo {
@@ -133,9 +131,9 @@ impl Shader {
                 };
 
                 let module = unsafe { device.create_shader_module(&create_info, None) }?;
-                Ok(Shader::Compiled(name, module))
+                Ok(Shader::Compiled(name.clone(), module))
             }
-            x @ Shader::Compiled(..) => Ok(x),
+            x @ Shader::Compiled(..) => Ok(x.clone()),
         }
     }
 }
@@ -227,6 +225,11 @@ impl MeshScene {
             _ => Err(anyhow!("field {} must be an array", field)),
         }
     }
+
+    //pub fn get_brdf_params_buffer(&self, storage_buffer_align: u32) -> Vec<u8> {
+    //}
+
+    //pub fn get_offsets_buffer(&self, )
 
     fn parse_toml_objects(
         conf: &Table,
@@ -386,10 +389,15 @@ impl MeshScene {
 
         let raygen = Self::parse_toml_shader(Self::get_field(global_shaders, "raygen")?, "raygen")?;
         let miss = Self::parse_toml_shader(Self::get_field(global_shaders, "miss")?, "miss")?;
-        let emitter_rchit = Self::parse_toml_shader(
-            Self::get_field(global_shaders, "emitter_hit")?,
-            "emitter_hit",
-        )?;
+
+        let mut chit_shaders = Vec::new();
+        if global_shaders.get("emitter_hit").is_some() {
+            let emitter_hit = Self::parse_toml_shader(
+                Self::get_field(global_shaders, "emitter_hit")?,
+                "emitter_hit",
+            )?;
+            chit_shaders.push(emitter_hit);
+        }
 
         // parse shaders in brdfs
         // these also include types
@@ -398,7 +406,6 @@ impl MeshScene {
         };
 
         let mut type_map = HashMap::new();
-        let mut chit_shaders = Vec::new();
 
         for brdf in brdfs {
             let Value::Table(brdf) = brdf else {
@@ -427,7 +434,6 @@ impl MeshScene {
             Shaders {
                 raygen,
                 miss,
-                emitter_rchit,
                 rchit: chit_shaders,
             },
             type_map,
