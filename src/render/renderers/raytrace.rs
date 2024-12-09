@@ -1304,6 +1304,8 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
                     std::mem::swap(&mut allocation, &mut self.storage_image_allocation);
                     allocator.free(allocation)?;
 
+                    self.storage_image_size = (*width, *height);
+
                     let image_info = vk::DescriptorImageInfo {
                         image_layout: vk::ImageLayout::GENERAL,
                         image_view: self.storage_image_view,
