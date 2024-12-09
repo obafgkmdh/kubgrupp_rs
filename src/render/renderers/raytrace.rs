@@ -870,7 +870,6 @@ impl RaytraceRenderer {
         target_image: vk::Image,
         (target_width, target_height): (u32, u32),
     ) -> anyhow::Result<()> {
-        println!("{} {}", target_width, target_height);
         let command_buffer_begin_info = vk::CommandBufferBeginInfo::default();
 
         unsafe {
