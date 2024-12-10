@@ -10,10 +10,6 @@
 #include "hitcommon.glsl"
 #include "random.glsl"
 
-struct BrdfParams {
-    vec3 albedo;
-};
-
 layout(location = 0) rayPayloadInEXT RayPayload ray_info;
 
 hitAttributeEXT vec2 bary_coord;
@@ -31,37 +27,17 @@ layout(scalar, set = 0, binding = 5) readonly buffer InstanceOffsets {
     Offsets offsets[];
 } offsets;
 
-layout(scalar, set = 0, binding = 6) readonly buffer Fields {
-    BrdfParams params[];
-} instance_info;
-
 void sample_brdf(vec3 hit_normal) {
-    uint brdf_i = offsets.offsets[gl_InstanceID].brdf_i;
-    BrdfParams brdf = instance_info.params[brdf_i];
-
-    vec4 cos_sample = sample_cosine_hemisphere();
-    vec3 wi = cos_sample.xyz;
-    float pdf = cos_sample.w;
-
-    ray_info.brdf_vals = brdf.albedo;
+    ray_info.brdf_vals = vec3(1);
     ray_info.brdf_pdf = 1;
 
-    // we need to convert the wi sample to be relative to the normal
-    // do this by creating a rotation from (0, 0, 1) to the normal
-    vec3 axis = vec3(hit_normal.y, -hit_normal.x, 0);
-    float cos_t = hit_normal.z;
-    float sin_t = length(axis);
-    vec3 r = normalize(axis);
-    ray_info.brdf_d =
-        wi * cos_t
-        + cross(wi, r) * sin_t
-        + r * dot(r, wi) * (1 - cos_t);
-}
-
-vec3 eval_brdf(vec3 wi, vec3 hit_normal) {
-    uint brdf_i = offsets.offsets[gl_InstanceID].brdf_i;
-    BrdfParams brdf = instance_info.params[brdf_i];
-    return brdf.albedo;
+    //float perpendicularity = dot(gl_WorldRayDirectionEXT, hit_normal);
+    //if (abs(perpendicularity) < 0.0001) {
+    //    ray_info.brdf_d = gl_WorldRayDirectionEXT;
+    //} else {
+    //    ray_info.brdf_d = reflect(gl_WorldRayDirectionEXT, hit_normal);
+    //}
+    ray_info.brdf_d = reflect(gl_WorldRayDirectionEXT, hit_normal);
 }
 
 void sample_emitter(vec3 hit_pos, vec3 hit_normal) {
@@ -90,8 +66,6 @@ void main() {
     sample_emitter(hit_pos, hit_normal);
     sample_brdf(hit_normal);
 
-    uint brdf_i = offsets.offsets[gl_InstanceID].brdf_i;
-    //ray_info.rad = instance_info.params[brdf_i].albedo;
     ray_info.hit_pos = hit_pos;
     ray_info.hit_normal = hit_normal;
     ray_info.is_hit = true;

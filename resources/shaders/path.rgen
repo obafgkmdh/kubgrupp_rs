@@ -103,44 +103,39 @@ void main() {
 
         // emitter sample from hit point
         // we trace from emitter_o to hit_pos to account for point lights
-        traceRayEXT(
-            topLevelAS,
-            rayFlags,
-            0xFF,
-            0,
-            0,
-            0,
-            emitter_o,
-            tMin,
-            normalize(obj_pos - emitter_o),
-            tMax,
-            0
-        );
+        if (!specular_reflection) {
+            traceRayEXT(
+                topLevelAS,
+                rayFlags,
+                0xFF,
+                0,
+                0,
+                0,
+                emitter_o,
+                tMin,
+                normalize(obj_pos - emitter_o),
+                tMax,
+                0
+            );
 
-        // check whether hit was on obj_hit_pos to calculate geometry term
-        float hit_dist = length(ray_info.hit_pos - obj_pos);
-        float v = float(hit_dist < 0.00001);
-        vec3 emitter_to_hit = normalize(dist_vec);
-        float emitter_dist = dot(dist_vec, dist_vec);
-        float cos_em = abs(dot(emitter_normal, emitter_to_hit));
-        float cos_obj = abs(dot(obj_normal, emitter_to_hit));
-        float g = cos_obj * cos_em / emitter_dist;
-        result +=
-            throughput
-            * g * v
-            * emitter_rad
-            * emitter_brdf_vals
-            / emitter_pdf;
+            // check whether hit was on obj_hit_pos to calculate geometry term
+            float hit_dist = length(ray_info.hit_pos - obj_pos);
+            float v = float(hit_dist < 0.00001);
+            vec3 emitter_to_hit = normalize(dist_vec);
+            float emitter_dist = dot(dist_vec, dist_vec);
+            float cos_em = abs(dot(emitter_normal, emitter_to_hit));
+            float cos_obj = abs(dot(obj_normal, emitter_to_hit));
+            float g = cos_obj * cos_em / emitter_dist;
+            result +=
+                throughput
+                * g * v
+                * emitter_rad
+                * emitter_brdf_vals
+                / emitter_pdf;
+        }
 
         throughput *= brdf_vals;
-
-        //if (depth == 1) {
-        //    debugPrintfEXT("%v3f", ray_d);
-        //}
     }
-
-    //result = toneMap(result, 1.5);
-    //result = gammaCorrection(result);
 
     vec3 rad = frame > 0 ? imageLoad(accum_image, ivec2(gl_LaunchIDEXT.xy)).rgb : vec3(0);
     rad += result;
