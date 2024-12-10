@@ -158,11 +158,5 @@ void main() {
 
     result = rad / (frame + 1.0);
 
-    //if (max(max(result.r, result.g), result.b) < 0.0031308) {
-    //    result *= 12.92;
-    //} else {
-    //    result = 1.055 * pow(result, vec3(1.0 / 2.4)) - 0.055;
-    //}
-
     imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(result, 1.0));
 }

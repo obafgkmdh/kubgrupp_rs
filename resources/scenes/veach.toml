@@ -5,17 +5,44 @@ emitter_hit = "emitter.rchit"
 
 [camera]
 view = '''
-lookat 0 3 1   0 -1 0.5    0 0 1
+lookat 0 12 6   0 -1 0.5    0 0 1
 '''
-fov = 70
+fov = 25
 
 [[light]]
 type = "area"
-color = [1, 1, 1]
+color = [2, 2, 2]
 mesh = "sphere.obj"
 transform = '''
-translate 3 -2 5
-scale 0.5 0.5 0.5
+scale 0.45 0.45 0.45
+translate 2.25 -2 1.5
+'''
+
+[[light]]
+type = "area"
+color = [2, 2, 2]
+mesh = "sphere.obj"
+transform = '''
+scale 0.15 0.15 0.15
+translate 0.75 -2 1.5
+'''
+
+[[light]]
+type = "area"
+color = [2, 2, 2]
+mesh = "sphere.obj"
+transform = '''
+scale 0.05 0.05 0.05
+translate -0.75 -2 1.5
+'''
+
+[[light]]
+type = "area"
+color = [2, 2, 2]
+mesh = "sphere.obj"
+transform = '''
+scale 0.01666 0.01666 0.01666
+translate -2.25 -2 1.5
 '''
 
 [[brdf]]
@@ -41,7 +68,7 @@ type = "float"
 [[object]]
 mesh = "square.obj"
 transform = '''
-translate -.5 -.5 0
+translate -.5 -.5 -1
 scale 15 10 1
 '''
 brdf = {name = "diffuse", fields = [[0.1, 0.1, 0.1]]}
@@ -51,15 +78,47 @@ mesh = "square.obj"
 transform = '''
 rotate 90 1 0 0
 translate -.5 -5 0
-scale 15 1 10
+scale 15 1 5
+translate 0 0 -1
 '''
 brdf = {name = "diffuse", fields = [[0.1, 0.1, 0.1]]}
 
 [[object]]
 mesh = "square.obj"
 transform = '''
-translate -0.5 -0.5 0.1
-scale 3 0.5 1
+translate -0.5 -0.5 -0.92
+scale 5 0.6 1
+rotate -10 1 0 0
+translate 0 0.5 0
+'''
+brdf = {name = "microfacet", fields = [[0.0175, 0.0225, 0.0325], 1.5, 0.1]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 -0.92
+scale 5 0.6 1
 rotate -15 1 0 0
+translate 0 -0.15 0.15
 '''
 brdf = {name = "microfacet", fields = [[0.0175, 0.0225, 0.0325], 1.5, 0.05]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 -0.92
+scale 5 0.6 1
+rotate -20 1 0 0
+translate 0 -0.8 0.35
+'''
+brdf = {name = "microfacet", fields = [[0.0175, 0.0225, 0.0325], 1.5, 0.02]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 -0.92
+scale 5 0.6 1
+rotate -30 1 0 0
+translate 0 -1.45 0.55
+'''
+brdf = {name = "microfacet", fields = [[0.0175, 0.0225, 0.0325], 1.5, 0.005]}
