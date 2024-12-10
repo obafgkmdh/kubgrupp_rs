@@ -114,7 +114,7 @@ void main() {
 
         // check whether hit was on obj_hit_pos to calculate geometry term
         float hit_dist = length(ray_info.hit_pos - obj_pos);
-        float v = float(hit_dist < 0.01);
+        float v = float(hit_dist < 0.0001);
         vec3 emitter_to_hit = normalize(dist_vec);
         float emitter_dist = dot(dist_vec, dist_vec);
         float cos_em = abs(dot(emitter_normal, emitter_to_hit));
@@ -128,9 +128,9 @@ void main() {
             / emitter_pdf;
 
         throughput *= ray_info.brdf_vals;
+        //debugPrintfEXT("%f", emitter_pdf);
     }
 
-    //debugPrintfEXT("%v3f", result);
     //result = toneMap(result, 1.5);
     //result = gammaCorrection(result);
 

@@ -12,7 +12,7 @@ fov = 70
 [[light]]
 type = "point"
 #color = [0.84, 0.76, 0.56]
-color = [20, 20, 20]
+color = [100, 100, 100]
 position = [-5, -5, 10]
 
 #[[light]]
@@ -22,11 +22,11 @@ position = [-5, -5, 10]
 
 #[[light]]
 #type = "area"
-#color = [0.5, 0.1, 0.5]
+#color = [0.0, 0.0, 0.0]
 #mesh = "square.obj"
 #transform = '''
 #rotate 45 0 0 1
-#translate 3 0 0
+#translate 3 0 10
 #'''
 
 [[brdf]]
@@ -76,18 +76,18 @@ translate 1 1 0
 '''
 brdf = {name = "diffuse", fields = [[0.8, 0.2, 0.2]]}
 
-#[[object]]
-#mesh = "sphere.obj"
-#transform = '''
-#scale .5 .5 .5
-#translate 3 -1 .5
-#'''
-#brdf = {name = "normals", fields = []}
+[[object]]
+mesh = "sphere.obj"
+transform = '''
+scale .5 .5 .5
+translate 3 -1 .5
+'''
+brdf = {name = "diffuse", fields = [[0.8, 0.2, 0.8]]}
 
 [[object]]
 mesh = "square.obj"
 transform = '''
-translate -.5 -.5 -.001
+translate -.5 -.5 -.00001
 scale 10 10 10
 '''
 brdf = {name = "diffuse", fields = [[0.6, 0.6, 0.6]]}
