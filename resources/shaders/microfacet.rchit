@@ -24,7 +24,7 @@ layout(scalar, set = 0, binding = BRDF_PARAMS_BINDING) readonly buffer Fields {
 } instance_info;
 
 float g1(vec3 wv, vec3 wh, vec3 hit_normal, float roughness) {
-    float cos_t = dot(hit_normal, wv);
+    float cos_t = dot(wv, hit_normal);
     float tan_t = sqrt(1 - cos_t * cos_t) / cos_t;
     float b = 1 / (roughness * tan_t);
     float val = b < 1.6 ? (3.535 * b + 2.181 * b * b) / (1.0 + 2.276 * b + 2.577 * b * b) : 1.0;
@@ -68,7 +68,7 @@ void sample_brdf(vec3 hit_normal, float ks) {
     float d = pdf_beckmann(dot(wh, hit_normal), brdf.roughness);
 
     ray_info.brdf_pdf = ks * d * jh + (1 - ks) * cos_sample.w;
-    ray_info.brdf_vals = eval_brdf(ray_info.brdf_d, hit_normal, ks) * dot(ray_info.brdf_d, hit_normal) / ray_info.brdf_pdf;
+    ray_info.brdf_vals = eval_brdf(ray_info.brdf_d, hit_normal, ks) * dot(ray_info.brdf_d, hit_normal);
 }
 
 void sample_emitter(vec3 hit_pos, vec3 hit_normal, float ks) {

@@ -1,0 +1,65 @@
+[global_shaders]
+raygen = "path.rgen"
+miss = "black.rmiss"
+emitter_hit = "emitter.rchit"
+
+[camera]
+view = '''
+lookat 0 3 1   0 -1 0.5    0 0 1
+'''
+fov = 70
+
+[[light]]
+type = "area"
+color = [1, 1, 1]
+mesh = "sphere.obj"
+transform = '''
+translate 3 -2 5
+scale 0.5 0.5 0.5
+'''
+
+[[brdf]]
+name = "diffuse"
+chit_shader = "diffuse.rchit"
+[[brdf.field]]
+name = "albedo"
+type = "vec3"
+
+[[brdf]]
+name = "microfacet"
+chit_shader = "microfacet.rchit"
+[[brdf.field]]
+name = "albedo"
+type = "vec3"
+[[brdf.field]]
+name = "ior"
+type = "float"
+[[brdf.field]]
+name = "roughness"
+type = "float"
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -.5 -.5 0
+scale 15 10 1
+'''
+brdf = {name = "diffuse", fields = [[0.1, 0.1, 0.1]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+rotate 90 1 0 0
+translate -.5 -5 0
+scale 15 1 10
+'''
+brdf = {name = "diffuse", fields = [[0.1, 0.1, 0.1]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0.1
+scale 3 0.5 1
+rotate -15 1 0 0
+'''
+brdf = {name = "microfacet", fields = [[0.0175, 0.0225, 0.0325], 1.5, 0.05]}
