@@ -359,7 +359,7 @@ where
             let window = event_loop
                 .create_window(
                     WindowAttributes::default()
-                        .with_inner_size(PhysicalSize::new(800, 800))
+                        .with_inner_size(PhysicalSize::new(WindowData::DEFAULT_WIDTH, WindowData::DEFAULT_HEIGHT))
                         .with_title("kubgrupp"),
                 )
                 .unwrap();
@@ -447,7 +447,6 @@ where
                     &device,
                     physical_device,
                     &queue_family_info,
-                    self.window.as_ref().unwrap(),
                     self.allocator.as_mut().unwrap().clone(),
                 )
                 .expect("failed to create renderer"),

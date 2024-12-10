@@ -11,11 +11,11 @@
 
 layout(location = 0) rayPayloadInEXT RayPayload ray_info;
 
-layout(scalar, set = 0, binding = 4) readonly buffer InstanceOffsets {
+layout(scalar, set = 0, binding = 5) readonly buffer InstanceOffsets {
     Offsets offsets[];
 } offsets;
 
-layout(scalar, set = 0, binding = 5) readonly buffer Fields {
+layout(scalar, set = 0, binding = 6) readonly buffer Fields {
     BrdfParams params[];
 } instance_info;
 

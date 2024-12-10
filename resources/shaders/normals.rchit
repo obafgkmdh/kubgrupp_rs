@@ -13,7 +13,7 @@ layout(location = 0) rayPayloadInEXT RayPayload ray_info;
 
 hitAttributeEXT vec2 bary_coord;
 
-layout(scalar, set = 0, binding = 2) readonly buffer Vertices {
+layout(scalar, set = 0, binding = 3) readonly buffer Vertices {
     Vertex vertices[];
 } vertices;
 

@@ -34,6 +34,9 @@ pub struct SwapchainSupportDetails {
 }
 
 impl WindowData {
+    pub const DEFAULT_WIDTH: u32 = 800;
+    pub const DEFAULT_HEIGHT: u32 = 800;
+
     pub fn new(
         vk_lib: &Entry,
         instance: &Instance,

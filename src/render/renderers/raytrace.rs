@@ -12,7 +12,7 @@ use crate::{
         scenes::mesh::{Light, MeshScene, MeshSceneUpdate, Object},
         Scene,
     },
-    utils::{align_up, AllocatedBuffer, QueueFamilyInfo},
+    utils::{align_up, AllocatedBuffer, AllocatedImage, QueueFamilyInfo},
     window::WindowData,
 };
 
@@ -40,10 +40,8 @@ pub struct RaytraceRenderer {
     descriptor_pool: vk::DescriptorPool,
     descriptor_set: vk::DescriptorSet,
     descriptor_set_layout: vk::DescriptorSetLayout,
-    storage_image: vk::Image,
-    storage_image_size: (u32, u32),
-    storage_image_view: vk::ImageView,
-    storage_image_allocation: Option<Allocation>,
+    storage_image: Option<AllocatedImage>,
+    accumulation_image: Option<AllocatedImage>,
     vertex_normal_buffer: Option<AllocatedBuffer>,
     light_buffer: Option<AllocatedBuffer>,
     offset_buffer: Option<AllocatedBuffer>,
@@ -356,10 +354,17 @@ impl RaytraceRenderer {
             },
             vk::DescriptorSetLayoutBinding {
                 descriptor_count: 1,
+                descriptor_type: vk::DescriptorType::STORAGE_IMAGE,
+                stage_flags: vk::ShaderStageFlags::RAYGEN_KHR,
+                binding: 1,
+                ..Default::default()
+            },
+            vk::DescriptorSetLayoutBinding {
+                descriptor_count: 1,
                 descriptor_type: vk::DescriptorType::ACCELERATION_STRUCTURE_KHR,
                 stage_flags: vk::ShaderStageFlags::RAYGEN_KHR
                     | vk::ShaderStageFlags::CLOSEST_HIT_KHR,
-                binding: 1,
+                binding: 2,
                 ..Default::default()
             },
             // vertices and normals
@@ -368,7 +373,7 @@ impl RaytraceRenderer {
                 descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
                 stage_flags: vk::ShaderStageFlags::RAYGEN_KHR
                     | vk::ShaderStageFlags::CLOSEST_HIT_KHR,
-                binding: 2,
+                binding: 3,
                 ..Default::default()
             },
             // lights
@@ -376,7 +381,7 @@ impl RaytraceRenderer {
                 descriptor_count: 1,
                 descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
                 stage_flags: vk::ShaderStageFlags::CLOSEST_HIT_KHR,
-                binding: 3,
+                binding: 4,
                 ..Default::default()
             },
             // offsets
@@ -384,7 +389,7 @@ impl RaytraceRenderer {
                 descriptor_count: 1,
                 descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
                 stage_flags: vk::ShaderStageFlags::CLOSEST_HIT_KHR,
-                binding: 4,
+                binding: 5,
                 ..Default::default()
             },
             // brdf params
@@ -392,7 +397,7 @@ impl RaytraceRenderer {
                 descriptor_count: 1,
                 descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
                 stage_flags: vk::ShaderStageFlags::CLOSEST_HIT_KHR,
-                binding: 5,
+                binding: 6,
                 ..Default::default()
             },
         ];
@@ -728,137 +733,6 @@ impl RaytraceRenderer {
         Ok((pool, set))
     }
 
-    fn create_storage_image(
-        &self,
-        width: u32,
-        height: u32,
-    ) -> anyhow::Result<(vk::Image, vk::ImageView, Allocation)> {
-        let image_create_info = vk::ImageCreateInfo {
-            image_type: vk::ImageType::TYPE_2D,
-            format: vk::Format::R8G8B8A8_UNORM,
-            extent: vk::Extent3D {
-                width,
-                height,
-                depth: 1,
-            },
-            mip_levels: 1,
-            array_layers: 1,
-            samples: vk::SampleCountFlags::TYPE_1,
-            tiling: vk::ImageTiling::OPTIMAL,
-            usage: vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC,
-            sharing_mode: vk::SharingMode::EXCLUSIVE,
-            ..Default::default()
-        };
-
-        let image = unsafe { self.device.create_image(&image_create_info, None)? };
-
-        let memory_req = unsafe { self.device.get_image_memory_requirements(image) };
-        let image_allocation = self
-            .allocator
-            .borrow_mut()
-            .allocate(&AllocationCreateDesc {
-                name: "storage image",
-                requirements: memory_req,
-                location: MemoryLocation::GpuOnly,
-                linear: false,
-                allocation_scheme: AllocationScheme::GpuAllocatorManaged,
-            })?;
-
-        unsafe {
-            self.device.bind_image_memory(
-                image,
-                image_allocation.memory(),
-                image_allocation.offset(),
-            )?;
-        }
-
-        let image_view = {
-            let image_view_create_info = vk::ImageViewCreateInfo {
-                view_type: vk::ImageViewType::TYPE_2D,
-                format: image_create_info.format,
-                subresource_range: vk::ImageSubresourceRange {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    base_mip_level: 0,
-                    level_count: 1,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                },
-                image,
-                ..Default::default()
-            };
-
-            unsafe {
-                self.device
-                    .create_image_view(&image_view_create_info, None)?
-            }
-        };
-
-        let command_buffer = {
-            let allocate_info = vk::CommandBufferAllocateInfo {
-                command_buffer_count: 1,
-                command_pool: self.command_pool,
-                level: vk::CommandBufferLevel::PRIMARY,
-                ..Default::default()
-            };
-
-            unsafe { self.device.allocate_command_buffers(&allocate_info)?[0] }
-        };
-
-        let image_barrier = vk::ImageMemoryBarrier {
-            src_access_mask: vk::AccessFlags::empty(),
-            dst_access_mask: vk::AccessFlags::empty(),
-            old_layout: vk::ImageLayout::UNDEFINED,
-            new_layout: vk::ImageLayout::GENERAL,
-            image,
-            subresource_range: vk::ImageSubresourceRange {
-                aspect_mask: vk::ImageAspectFlags::COLOR,
-                base_mip_level: 0,
-                level_count: 1,
-                base_array_layer: 0,
-                layer_count: 1,
-            },
-            ..Default::default()
-        };
-
-        let command_buffer_begin_info = vk::CommandBufferBeginInfo {
-            flags: vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT,
-            ..Default::default()
-        };
-
-        unsafe {
-            self.device
-                .begin_command_buffer(command_buffer, &command_buffer_begin_info)?;
-            self.device.cmd_pipeline_barrier(
-                command_buffer,
-                vk::PipelineStageFlags::TOP_OF_PIPE,
-                vk::PipelineStageFlags::BOTTOM_OF_PIPE,
-                vk::DependencyFlags::empty(),
-                &[],
-                &[],
-                &[image_barrier],
-            );
-
-            self.device.end_command_buffer(command_buffer)?;
-        }
-
-        let submit_info = vk::SubmitInfo {
-            command_buffer_count: 1,
-            p_command_buffers: &raw const command_buffer,
-            ..Default::default()
-        };
-
-        unsafe {
-            self.device
-                .queue_submit(self.compute_queue, &[submit_info], vk::Fence::null())?;
-
-            self.device.queue_wait_idle(self.compute_queue)?;
-            self.device
-                .free_command_buffers(self.command_pool, &[command_buffer]);
-        }
-
-        Ok((image, image_view, image_allocation))
-    }
-
     fn create_command_buffer(&self) -> anyhow::Result<vk::CommandBuffer> {
         let allocate_info = vk::CommandBufferAllocateInfo {
             command_buffer_count: 1,
@@ -913,8 +787,8 @@ impl RaytraceRenderer {
                 &self.miss_region,
                 &self.hit_region,
                 &self.callable_region,
-                self.storage_image_size.0,
-                self.storage_image_size.1,
+                self.storage_image.as_ref().unwrap().width,
+                self.storage_image.as_ref().unwrap().height,
                 1,
             );
 
@@ -948,7 +822,7 @@ impl RaytraceRenderer {
 
             self.device.cmd_blit_image(
                 command_buffer,
-                self.storage_image,
+                self.storage_image.as_ref().unwrap().image,
                 vk::ImageLayout::GENERAL,
                 target_image,
                 vk::ImageLayout::TRANSFER_DST_OPTIMAL,
@@ -962,8 +836,8 @@ impl RaytraceRenderer {
                     src_offsets: [
                         vk::Offset3D { x: 0, y: 0, z: 0 },
                         vk::Offset3D {
-                            x: self.storage_image_size.0 as i32,
-                            y: self.storage_image_size.1 as i32,
+                            x: self.storage_image.as_ref().unwrap().height as i32,
+                            y: self.storage_image.as_ref().unwrap().height as i32,
                             z: 1,
                         },
                     ],
@@ -1023,7 +897,6 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
         device: &Device,
         physical_device: vk::PhysicalDevice,
         queue_family_info: &QueueFamilyInfo,
-        target: &WindowData,
         allocator: Rc<RefCell<Allocator>>,
     ) -> anyhow::Result<Self> {
         let accel_struct_device = khr::acceleration_structure::Device::new(instance, device);
@@ -1079,9 +952,7 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             descriptor_set: Default::default(),
             descriptor_set_layout: Default::default(),
             storage_image: Default::default(),
-            storage_image_size: target.get_size(),
-            storage_image_view: Default::default(),
-            storage_image_allocation: Default::default(),
+            accumulation_image: Default::default(),
             vertex_normal_buffer: Default::default(),
             light_buffer: Default::default(),
             offset_buffer: Default::default(),
@@ -1093,13 +964,35 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
     }
 
     fn ingest_scene(&mut self, scene: &MeshScene) -> anyhow::Result<()> {
-        let storage_image_allocation: Allocation;
-        (
-            self.storage_image,
-            self.storage_image_view,
-            storage_image_allocation,
-        ) = self.create_storage_image(self.storage_image_size.0, self.storage_image_size.1)?;
-        self.storage_image_allocation = Some(storage_image_allocation);
+        self.storage_image = Some(AllocatedImage::new(
+            &self.device,
+            &mut self.allocator.borrow_mut(),
+            (WindowData::DEFAULT_WIDTH, WindowData::DEFAULT_HEIGHT),
+            vk::Format::R8G8B8A8_UNORM,
+            vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC,
+            MemoryLocation::GpuOnly,
+        )?);
+        self.storage_image.as_mut().unwrap().transition(
+            &self.device,
+            self.compute_queue,
+            self.command_pool,
+            vk::ImageLayout::GENERAL,
+        )?;
+
+        self.accumulation_image = Some(AllocatedImage::new(
+            &self.device,
+            &mut self.allocator.borrow_mut(),
+            (WindowData::DEFAULT_WIDTH, WindowData::DEFAULT_HEIGHT),
+            vk::Format::R32G32B32A32_SFLOAT,
+            vk::ImageUsageFlags::STORAGE,
+            MemoryLocation::GpuOnly,
+        )?);
+        self.accumulation_image.as_mut().unwrap().transition(
+            &self.device,
+            self.compute_queue,
+            self.command_pool,
+            vk::ImageLayout::GENERAL,
+        )?;
 
         let (mesh_geometries, mesh_buffers, mesh_primitive_counts) =
             self.get_mesh_geometries(&scene.meshes)?;
@@ -1214,7 +1107,7 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
 
         let image_info = vk::DescriptorImageInfo {
             image_layout: vk::ImageLayout::GENERAL,
-            image_view: self.storage_image_view,
+            image_view: self.storage_image.as_ref().unwrap().image_view,
             sampler: vk::Sampler::null(),
         };
         writes.push(vk::WriteDescriptorSet {
@@ -1227,6 +1120,21 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             ..Default::default()
         });
 
+        let accumulation_info = vk::DescriptorImageInfo {
+            image_layout: vk::ImageLayout::GENERAL,
+            image_view: self.accumulation_image.as_ref().unwrap().image_view,
+            sampler: vk::Sampler::null(),
+        };
+        writes.push(vk::WriteDescriptorSet {
+            dst_set: self.descriptor_set,
+            dst_binding: 1,
+            dst_array_element: 0,
+            descriptor_type: vk::DescriptorType::STORAGE_IMAGE,
+            descriptor_count: 1,
+            p_image_info: &raw const accumulation_info,
+            ..Default::default()
+        });
+
         let accel_info = vk::WriteDescriptorSetAccelerationStructureKHR {
             acceleration_structure_count: 1,
             p_acceleration_structures: &raw const self.top_as,
@@ -1234,7 +1142,7 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
         };
         writes.push(vk::WriteDescriptorSet {
             dst_set: self.descriptor_set,
-            dst_binding: 1,
+            dst_binding: 2,
             dst_array_element: 0,
             descriptor_type: vk::DescriptorType::ACCELERATION_STRUCTURE_KHR,
             descriptor_count: 1,
@@ -1263,7 +1171,7 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             });
             writes.push(vk::WriteDescriptorSet {
                 dst_set: self.descriptor_set,
-                dst_binding: i as u32 + 2,
+                dst_binding: writes.len() as u32,
                 dst_array_element: 0,
                 descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
                 descriptor_count: 1,
@@ -1293,36 +1201,46 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
                 }
                 MeshSceneUpdate::NewSize((width, height, projection)) => unsafe {
                     self.device.device_wait_idle()?;
-                    self.device
-                        .destroy_image_view(self.storage_image_view, None);
-                    self.device.destroy_image(self.storage_image, None);
 
-                    let allocation: Allocation;
-                    (self.storage_image, self.storage_image_view, allocation) =
-                        self.create_storage_image(*width, *height)?;
-                    self.allocator
-                        .borrow_mut()
-                        .free(self.storage_image_allocation.take().unwrap())?;
-                    self.storage_image_allocation = Some(allocation);
+                    let mut infos = Vec::new();
+                    let mut writes = Vec::new();
+                    for image in [&mut self.storage_image, &mut self.accumulation_image] {
+                        let old_image = image.take().unwrap();
 
-                    self.storage_image_size = (*width, *height);
+                        *image = Some(AllocatedImage::new(
+                            &self.device,
+                            &mut self.allocator.borrow_mut(),
+                            (*width, *height),
+                            old_image.format,
+                            old_image.usage,
+                            MemoryLocation::GpuOnly,
+                        )?);
+                        image.as_mut().unwrap().transition(
+                            &self.device,
+                            self.compute_queue,
+                            self.command_pool,
+                            vk::ImageLayout::GENERAL,
+                        )?;
 
-                    let image_info = vk::DescriptorImageInfo {
-                        image_layout: vk::ImageLayout::GENERAL,
-                        image_view: self.storage_image_view,
-                        sampler: vk::Sampler::null(),
-                    };
-                    let image_write = vk::WriteDescriptorSet {
-                        dst_set: self.descriptor_set,
-                        dst_binding: 0,
-                        dst_array_element: 0,
-                        descriptor_type: vk::DescriptorType::STORAGE_IMAGE,
-                        descriptor_count: 1,
-                        p_image_info: &raw const image_info,
-                        ..Default::default()
-                    };
+                        old_image.destroy(&self.device, &mut self.allocator.borrow_mut());
 
-                    self.device.update_descriptor_sets(&[image_write], &[]);
+                        infos.push(vk::DescriptorImageInfo {
+                            image_layout: vk::ImageLayout::GENERAL,
+                            image_view: image.as_ref().unwrap().image_view,
+                            sampler: vk::Sampler::null(),
+                        });
+                        writes.push(vk::WriteDescriptorSet {
+                            dst_set: self.descriptor_set,
+                            dst_binding: writes.len() as u32,
+                            dst_array_element: 0,
+                            descriptor_type: vk::DescriptorType::STORAGE_IMAGE,
+                            descriptor_count: 1,
+                            p_image_info: infos.as_ptr().add(writes.len()),
+                            ..Default::default()
+                        });
+                    }
+
+                    self.device.update_descriptor_sets(&writes, &[]);
 
                     let projection_inverse_cols = projection.inverse().to_cols_array();
                     let projection_bytes: &[u8] = bytemuck::cast_slice(&projection_inverse_cols);
@@ -1462,11 +1380,12 @@ impl Drop for RaytraceRenderer {
                 x.destroy(&self.device, &mut self.allocator.borrow_mut());
             }
 
-            self.device
-                .destroy_image_view(self.storage_image_view, None);
-            self.device.destroy_image(self.storage_image, None);
-            if let Some(x) = self.storage_image_allocation.take() {
-                self.allocator.borrow_mut().free(x).unwrap();
+            if let Some(x) = self.storage_image.take() {
+                x.destroy(&self.device, &mut self.allocator.borrow_mut());
+            }
+
+            if let Some(x) = self.accumulation_image.take() {
+                x.destroy(&self.device, &mut self.allocator.borrow_mut());
             }
 
             if let Some(x) = self.vertex_normal_buffer.take() {

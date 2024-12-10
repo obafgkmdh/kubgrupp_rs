@@ -19,7 +19,6 @@ where
         device: &Device,
         physical_device: vk::PhysicalDevice,
         queue_family_info: &QueueFamilyInfo,
-        target: &Target,
         allocator: Rc<RefCell<Allocator>>,
     ) -> anyhow::Result<Self>;
 
