@@ -18,9 +18,12 @@ use log::warn;
 use tobj::Model;
 use toml::{map::Map, Table, Value};
 
-use crate::scene::{
-    type_lexer::{Token, TokenIter},
-    Scene,
+use crate::{
+    camera::Camera,
+    scene::{
+        type_lexer::{Token, TokenIter},
+        Scene,
+    },
 };
 
 const MESHES_DIR: &str = "resources/meshes";
@@ -28,7 +31,7 @@ const SPIRV_DIR: &str = "resources/shaders/spv/";
 const SPIRV_EXTENSION: &str = ".spv";
 const SPIRV_MAGIC: u32 = 0x07230203;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct MeshScene {
     pub camera: Camera,
     pub lights: Vec<Light>,
@@ -41,17 +44,6 @@ pub struct MeshScene {
 
     pub brdf_buf: Vec<u8>,
     pub offset_buf: Vec<u32>,
-}
-
-#[derive(Debug, Clone)]
-pub struct Camera {
-    // matrix from world space to camera space
-    pub view: Mat4,
-
-    // matrix from camera to clip space
-    pub perspective: Mat4,
-
-    fov: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -172,15 +164,9 @@ impl ShaderType {
 
 impl MeshScene {
     pub fn on_resize(&mut self, width: u32, height: u32) -> Mat4 {
-        let fov_radians = self.camera.fov * PI / 180f32;
+        self.camera.handle_resize(width, height);
 
-        let mut perspective =
-            Mat4::perspective_lh(fov_radians, width as f32 / height as f32, 0.1f32, 1000f32);
-        perspective.y_axis = -perspective.y_axis;
-
-        self.camera.perspective = perspective;
-
-        perspective
+        self.camera.perspective()
     }
 
     pub fn load_from(mut reader: impl Read) -> Result<Self> {
@@ -948,14 +934,6 @@ impl MeshScene {
             _ => bail!("camera.fov must be an integer or float"),
         };
 
-        // convert to radians
-        let fov_radians = fov * PI / 180f32;
-
-        // use 1 as default aspect ratio
-        // ideally this will never actually be used since it will be updated immediately after window creation
-        let mut perspective = Mat4::perspective_lh(fov_radians, 1f32, 0.1f32, 1000f32);
-        perspective.y_axis = -perspective.y_axis;
-
         let Value::String(view_str) = camera_table
             .get("view")
             .ok_or(anyhow!("camera.view must be set"))?
@@ -964,11 +942,7 @@ impl MeshScene {
         };
         let view = Self::parse_transform(view_str)?;
 
-        Ok(Camera {
-            view,
-            perspective,
-            fov,
-        })
+        Ok(Camera::new(view, fov))
     }
 }
 

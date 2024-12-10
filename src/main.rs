@@ -4,6 +4,7 @@ use std::fs::File;
 use std::path::Path;
 use std::ptr;
 use std::rc::Rc;
+use std::time::Instant;
 
 use anyhow::Result;
 use ash::vk::{
@@ -20,7 +21,6 @@ use clap::Parser;
 use debug::DebugUtilsData;
 use defer::Defer;
 use env_logger::Builder;
-use glam::{Mat3, Mat4, Vec3};
 use gpu_allocator::vulkan::{Allocator, AllocatorCreateDesc};
 use log::{debug, warn, LevelFilter};
 use render::renderers::RaytraceRenderer;
@@ -33,10 +33,11 @@ use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
-use winit::keyboard::{KeyCode, PhysicalKey};
+use winit::keyboard::PhysicalKey;
 use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::window::{CursorGrabMode, WindowAttributes, WindowId};
 
+mod camera;
 mod debug;
 mod defer;
 mod features;
@@ -68,16 +69,8 @@ struct MeshApp<R> {
     instance: Instance,
     vk_lib: Entry,
     scene: MeshScene,
-    position: Vec3,
-    direction: Vec3,
-    view_updated: bool,
-    w_down: bool,
-    a_down: bool,
-    s_down: bool,
-    d_down: bool,
-    shift_down: bool,
-    space_down: bool,
     pending_resize: Option<(u32, u32)>,
+    prev_instant: Option<Instant>,
 }
 
 impl<R> MeshApp<R>
@@ -131,9 +124,6 @@ where
             })
             .transpose()?;
 
-        let position = scene.camera.view.inverse().col(3).truncate();
-        let direction = scene.camera.view.inverse().col(2).truncate();
-
         Ok(MeshApp {
             renderer: None,
             window: None,
@@ -144,16 +134,8 @@ where
             instance: instance.undefer(),
             vk_lib,
             scene,
-            position,
-            direction,
-            view_updated: false,
-            w_down: false,
-            a_down: false,
-            s_down: false,
-            d_down: false,
-            shift_down: false,
-            space_down: false,
             pending_resize: None,
+            prev_instant: None,
         })
     }
 
@@ -361,7 +343,10 @@ where
             let window = event_loop
                 .create_window(
                     WindowAttributes::default()
-                        .with_inner_size(PhysicalSize::new(WindowData::DEFAULT_WIDTH, WindowData::DEFAULT_HEIGHT))
+                        .with_inner_size(PhysicalSize::new(
+                            WindowData::DEFAULT_WIDTH,
+                            WindowData::DEFAULT_HEIGHT,
+                        ))
                         .with_title("kubgrupp"),
                 )
                 .unwrap();
@@ -479,61 +464,32 @@ where
                 device_id: _device_id,
                 event: input_event,
                 is_synthetic: _is_synthetic,
-            } => match input_event.physical_key {
-                PhysicalKey::Code(KeyCode::KeyW) => self.w_down = input_event.state.is_pressed(),
-                PhysicalKey::Code(KeyCode::KeyA) => self.a_down = input_event.state.is_pressed(),
-                PhysicalKey::Code(KeyCode::KeyS) => self.s_down = input_event.state.is_pressed(),
-                PhysicalKey::Code(KeyCode::KeyD) => self.d_down = input_event.state.is_pressed(),
-                PhysicalKey::Code(KeyCode::ShiftLeft) => {
-                    self.shift_down = input_event.state.is_pressed()
+            } => {
+                if let PhysicalKey::Code(key_code) = input_event.physical_key {
+                    self.scene
+                        .camera
+                        .handle_key_input(key_code, input_event.state.is_pressed());
                 }
-                PhysicalKey::Code(KeyCode::Space) => {
-                    self.space_down = input_event.state.is_pressed()
-                }
-                _ => (),
-            },
+            }
             WindowEvent::Resized(PhysicalSize { width, height }) => {
                 self.pending_resize = Some((width, height));
             }
             WindowEvent::RedrawRequested => {
-                const SPEED: f32 = 0.005f32;
-                let horiz_dir: Vec3 =
-                    Vec3::new(-self.direction.y, self.direction.x, 0f32).normalize();
-                let vert_dir: Vec3 = self.direction.cross(horiz_dir);
-                if self.w_down {
-                    self.position += SPEED * self.direction;
-                    self.view_updated = true;
-                }
-                if self.s_down {
-                    self.position -= SPEED * self.direction;
-                    self.view_updated = true;
-                }
-                if self.a_down {
-                    self.position -= SPEED * horiz_dir;
-                    self.view_updated = true;
-                }
-                if self.d_down {
-                    self.position += SPEED * horiz_dir;
-                    self.view_updated = true;
-                }
-                if self.shift_down {
-                    self.position -= SPEED * vert_dir;
-                    self.view_updated = true;
-                }
-                if self.space_down {
-                    self.position += SPEED * vert_dir;
-                    self.view_updated = true;
-                }
-
-                let mut updates = if self.view_updated {
-                    vec![MeshSceneUpdate::NewView(Mat4::look_to_lh(
-                        self.position,
-                        self.direction,
-                        Vec3::new(0f32, 0f32, 1f32),
-                    ))]
+                let dt: f32;
+                if let Some(t) = self.prev_instant.as_ref() {
+                    dt = t.elapsed().as_secs_f32()
                 } else {
-                    vec![]
-                };
+                    dt = 0f32;
+                }
+                self.prev_instant = Some(Instant::now());
+
+                self.scene.camera.handle_movement(dt);
+
+                let mut updates = Vec::new();
+
+                if let Some(new_view) = self.scene.camera.update_view() {
+                    updates.push(MeshSceneUpdate::NewView(new_view));
+                }
 
                 if let Some((w, h)) = self.pending_resize {
                     let proj = self.scene.on_resize(w, h);
@@ -545,8 +501,6 @@ where
                     .unwrap()
                     .render_to(&updates, self.window.as_mut().unwrap())
                     .expect("failed to render to target");
-
-                self.view_updated = false;
 
                 self.window.as_ref().unwrap().request_redraw();
             }
@@ -562,23 +516,9 @@ where
     ) {
         if let DeviceEvent::MouseMotion { delta: (dx, dy) } = event {
             let (sx, sy) = self.window.as_ref().unwrap().get_size();
-            let ry_axis = Vec3::new(-self.direction.y, self.direction.x, 0f32);
-            let rx_axis = Vec3::new(0f32, 0f32, 1f32);
-            let rx = (dx / sx as f64) as f32;
-            let ry = (dy / sy as f64) as f32;
-
-            let rot_x = Mat3::from_axis_angle(rx_axis, rx);
-            let rot_y = Mat3::from_axis_angle(ry_axis.normalize(), ry);
-
-            let new_direction = rot_x * rot_y * self.direction;
-
-            if new_direction.truncate().dot(self.direction.truncate()) < 0f32 {
-                self.direction = (rot_x * self.direction).normalize();
-            } else {
-                self.direction = new_direction.normalize();
-            }
-
-            self.view_updated = true;
+            self.scene
+                .camera
+                .handle_mouse_input((dx / sx as f64) as f32, (dy / sy as f64) as f32);
         }
     }
 }

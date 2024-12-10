@@ -1096,8 +1096,8 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             });
         }
 
-        let view_inverse_cols = scene.camera.view.inverse().to_cols_array();
-        let proj_inverse_cols = scene.camera.perspective.inverse().to_cols_array();
+        let view_inverse_cols = scene.camera.view().inverse().to_cols_array();
+        let proj_inverse_cols = scene.camera.perspective().inverse().to_cols_array();
         let view_bytes: &[u8] = bytemuck::cast_slice(&view_inverse_cols);
         let proj_bytes: &[u8] = bytemuck::cast_slice(&proj_inverse_cols);
         self.push_data[0..64].copy_from_slice(view_bytes);
@@ -1198,6 +1198,8 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
                     let view_inverse_cols = view.inverse().to_cols_array();
                     let view_bytes: &[u8] = bytemuck::cast_slice(&view_inverse_cols);
                     self.push_data[0..64].copy_from_slice(view_bytes);
+
+                    self.current_frame = 0;
                 }
                 MeshSceneUpdate::NewSize((width, height, projection)) => unsafe {
                     self.device.device_wait_idle()?;
@@ -1245,6 +1247,8 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
                     let projection_inverse_cols = projection.inverse().to_cols_array();
                     let projection_bytes: &[u8] = bytemuck::cast_slice(&projection_inverse_cols);
                     self.push_data[64..128].copy_from_slice(projection_bytes);
+
+                    self.current_frame = 0;
                 },
             }
         }
