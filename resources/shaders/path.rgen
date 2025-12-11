@@ -28,7 +28,7 @@ void main() {
     const uint ray_flags = gl_RayFlagsOpaqueEXT;
     const float t_min = 0.001;
     const float t_max = 1000.0;
- 
+
     vec3 result = vec3(0);
 
     for (uint i = 0; i < SPP; i++) {
@@ -87,7 +87,7 @@ void main() {
             }
 
             // at this point we know ray hit an object
-            // we then want to sample emitters to actualy add to result
+            // we then want to sample emitters to actually add to result
             // our shaders do this for us, so all we need
             // to do is use this result
 
