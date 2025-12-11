@@ -91,6 +91,13 @@ impl Camera {
                 Box::new(|dir: &Vec3| dir.cross(Vec3::new(-dir.y, dir.x, 0f32).normalize())),
             ),
         );
+        key_movements.insert(
+            KeyCode::Escape,
+            (
+                Direction::Up,
+                Box::new(|_: &Vec3| panic!()),
+            ),
+        );
 
         let fov_radians = fov * PI / 180f32;
         let mut perspective = Mat4::perspective_lh(
