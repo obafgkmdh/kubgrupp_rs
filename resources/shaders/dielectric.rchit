@@ -29,7 +29,8 @@ void sample_brdf(vec3 hit_normal) {
     uint brdf_i = offsets.offsets[gl_InstanceID].brdf_i;
     BrdfParams brdf = instance_info.params[brdf_i];
 
-    float lambda_squared = pow(ray_info.wavelength, 2);
+    float wavelength = ray_info.wavelength;
+    float lambda_squared = pow(wavelength / 1000, 2);
     float eta_squared = 1;
     for (int i = 0; i < 3; i++) {
         eta_squared += brdf.b[i] * lambda_squared / (lambda_squared - brdf.c[i]);
