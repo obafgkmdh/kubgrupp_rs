@@ -45,6 +45,13 @@ vec2 eval_brdf(vec3 wi, vec3 hit_normal) {
 }
 
 void sample_emitter(vec3 hit_pos, vec3 hit_normal) {
+    // default values
+    ray_info.emitter_pdf = 1;
+    ray_info.emitter_brdf_val = 0;
+    ray_info.emitter_brdf_pdf = 1;
+    ray_info.emitter_normal = vec3(1);
+    ray_info.rad = vec3(0);
+
     // pick a random emitter
     uint light_i = uint(rnd(ray_info.seed) * lights.num_lights);
 
@@ -67,18 +74,25 @@ void sample_emitter(vec3 hit_pos, vec3 hit_normal) {
         float b = (1 - s) * t;
         float c = s * t;
 
-        vec3 ab = light.vertices[1] - light.vertices[0];
-        vec3 ac = light.vertices[2] - light.vertices[0];
+        vec3 ab = light.data[1] - light.data[0];
+        vec3 ac = light.data[2] - light.data[0];
         vec3 normal = cross(ab, ac);
         float area = length(normal) / 2;
         normal = normalize(normal);
 
         ray_info.emitter_o =
-            a * light.vertices[0] + b * light.vertices[1] + c * light.vertices[2];
+            a * light.data[0] + b * light.data[1] + c * light.data[2];
 
         vec3 dir_to_light = normalize(ray_info.emitter_o - hit_pos);
-        float angle_to_light = dot(dir_to_light, normal);
-        if (angle_to_light >= 0) {
+        float cos_angle_to_light = dot(dir_to_light, normal);
+        bool visible = false;
+        if (light.emit_type == 0.0 && cos_angle_to_light >= 0.995) {
+            visible = true;
+        } else if (light.emit_type == 1.0 && cos_angle_to_light >= 0.0) {
+            visible = true;
+        }
+
+        if (visible) {
             vec2 brdf_eval = eval_brdf(dir_to_light, hit_normal);
 
             ray_info.emitter_pdf = 1.0 / lights.num_lights / area;
@@ -87,6 +101,28 @@ void sample_emitter(vec3 hit_pos, vec3 hit_normal) {
             ray_info.emitter_normal = normal;
             ray_info.rad = vec3(rgb_to_spectrum(light.color, ray_info.wavelength));
         }
+    } else if (light.type == EMITTER_TYPE_DIRECTIONAL) {
+        vec3 light_dir = normalize(light.data[0]);
+        vec3 dir_to_light = -light_dir;
+        vec2 brdf_eval = eval_brdf(dir_to_light, hit_normal);
+
+        vec3 to_hit = hit_pos - light.position;
+        float along_axis = dot(to_hit, light_dir);
+        vec3 perpendicular = to_hit - along_axis * light_dir;
+        float perp_dist = length(perpendicular);
+        float radius = light.data[1].r;
+
+        vec3 emitter_pos = light.position + perpendicular;
+        float dist_sq = max(along_axis * along_axis, 1.0);
+
+        bool in_beam = along_axis > 0.0 && perp_dist <= radius;
+
+        ray_info.emitter_o = emitter_pos;
+        ray_info.emitter_pdf = 1.0 / lights.num_lights;
+        ray_info.emitter_brdf_val = brdf_eval[0];
+        ray_info.emitter_brdf_pdf = brdf_eval[1];
+        ray_info.emitter_normal = -dir_to_light;
+        ray_info.rad = in_beam ? vec3(rgb_to_spectrum(light.color, ray_info.wavelength)) * dist_sq : vec3(0);
     }
 }
 

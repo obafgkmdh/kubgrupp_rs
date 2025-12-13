@@ -18,9 +18,9 @@ void main() {
     //Vertex a = vertices.vertices[gl_InstanceCustomIndexEXT + 3*gl_PrimitiveID];
     //Vertex b = vertices.vertices[gl_InstanceCustomIndexEXT + 3*gl_PrimitiveID + 1];
     //Vertex c = vertices.vertices[gl_InstanceCustomIndexEXT + 3*gl_PrimitiveID + 2];
-    vec3 a = light.vertices[0];
-    vec3 b = light.vertices[1];
-    vec3 c = light.vertices[2];
+    vec3 a = light.data[0];
+    vec3 b = light.data[1];
+    vec3 c = light.data[2];
 
     vec3 full_bary_coord = vec3(1 - bary_coord.x - bary_coord.y, bary_coord);
 
@@ -30,8 +30,8 @@ void main() {
         + c * full_bary_coord.z;
     hit_pos = gl_ObjectToWorldEXT * vec4(hit_pos, 1);
 
-    vec3 ab = light.vertices[1] - light.vertices[0];
-    vec3 ac = light.vertices[2] - light.vertices[0];
+    vec3 ab = light.data[1] - light.data[0];
+    vec3 ac = light.data[2] - light.data[0];
     vec3 normal = cross(ab, ac);
     float area = length(normal) / 2;
     normal = normalize(normal);
@@ -42,4 +42,5 @@ void main() {
     ray_info.hit_pos = hit_pos;
     ray_info.hit_normal = normal;
     ray_info.emitter_pdf = 1.0 / lights.num_lights / area;
+    ray_info.emitter_type = light.emit_type;
 }

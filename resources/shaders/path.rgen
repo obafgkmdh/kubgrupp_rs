@@ -10,12 +10,13 @@
 #include "random.glsl"
 #include "color_spaces.glsl"
 
-// #define MIS
+#define MIS
+// #define SAMPLE_EMITTER
 
 layout(location = 0) rayPayloadEXT RayPayload ray_info;
 
-const uint MAX_DEPTH = 8;
-const uint SPP = 8;
+const uint MAX_DEPTH = 16;
+const uint SPP = 64;
 
 float power_heuristic(float a, float b) {
     float t = a * a;
@@ -38,7 +39,7 @@ void main() {
         const vec2 in_uv = pixel_center / vec2(gl_LaunchSizeEXT.xy);
         const float wavelength = rnd(ray_info.seed) * rangeWavelengths + minWavelength;
         ray_info.wavelength = wavelength;
-        const vec3 wavelength_rgb = spectrumToRgb(wavelength);
+        const vec3 wavelength_rgb = max(vec3(0), spectrumToRgb(wavelength));
 
         vec2 d = in_uv * 2.0 - 1.0;
 
@@ -77,11 +78,8 @@ void main() {
 
             // emitter hits terminate paths
             if (ray_info.is_emitter) {
-                if (specular_reflection) {
-                    if (dot(normalize(ray_d), ray_info.hit_normal) >= 0) {
-                        value += throughput * ray_info.rad.x;
-                    }
-                } else {
+#ifdef SAMPLE_EMITTER
+                if (!specular_reflection) {
 #ifdef MIS
                     vec3 dist_vec = ray_info.hit_pos - ray_o;
                     float dist_sq = dot(dist_vec, dist_vec);
@@ -90,6 +88,14 @@ void main() {
                     //result += throughput * mis_weight * ray_info.rad / dist_sq;
                     value += throughput * mis_weight * ray_info.rad.x;
 #endif
+                    break;
+                }
+#endif
+                if (ray_info.emitter_type == 1.0 && dot(ray_d, ray_info.hit_normal) >= 0.0) {
+                    value += throughput * ray_info.rad.x;
+                }
+                if (ray_info.emitter_type == 0.0 && dot(ray_d, ray_info.hit_normal) >= 0.995) {
+                    value += throughput * ray_info.rad.x;
                 }
                 break;
             }
@@ -116,6 +122,7 @@ void main() {
             specular_reflection = ray_info.is_specular;
             prev_brdf_pdf = ray_info.brdf_pdf;
 
+#ifdef SAMPLE_EMITTER
             // emitter sample from hit point
             // we trace from emitter_o to hit_pos to account for point lights
             if (!specular_reflection) {
@@ -162,8 +169,19 @@ void main() {
                     / emitter_pdf;
 #endif
             }
+#endif
 
             throughput *= brdf_val;
+
+            // russian roulette
+            if (depth >= 3) {
+                const float cont_prob = 0.9;
+                if (rnd(ray_info.seed) < cont_prob) {
+                    throughput *= 1 / cont_prob;
+                } else {
+                    break;
+                }
+            }
         }
         result += value * wavelength_rgb;
     }

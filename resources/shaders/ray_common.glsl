@@ -25,4 +25,5 @@ struct RayPayload {
 
     float brdf_val;
     float emitter_brdf_val;
+    float emitter_type;
 };

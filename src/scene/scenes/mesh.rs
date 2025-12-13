@@ -48,8 +48,21 @@ pub struct MeshScene {
 
 #[derive(Debug, Clone)]
 pub enum Light {
-    Point { color: Vec3, position: Vec3 },
-    Triangle { color: Vec3, vertices: [Vec3; 3] },
+    Point {
+        color: Vec3,
+        position: Vec3,
+    },
+    Triangle {
+        color: Vec3,
+        vertices: [Vec3; 3],
+        emit_type: f32,
+    },
+    Directional {
+        color: Vec3,
+        position: Vec3,
+        direction: Vec3,
+        radius: f32,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -608,6 +621,12 @@ impl MeshScene {
                         as usize;
                     let mesh = &meshes[mesh_i].mesh;
 
+                    let value = match light_conf.get("emit_type") {
+                        Some(v) => v,
+                        _ => &Value::Integer(1)
+                    };
+                    let emit_type = Self::parse_toml_f32(value)?;
+
                     let start_idx = lights.len();
 
                     // load triangles to get triangle lights
@@ -634,6 +653,7 @@ impl MeshScene {
                         lights.push(Light::Triangle {
                             color,
                             vertices: vertices.try_into().unwrap(),
+                            emit_type,
                         })
                     }
 
@@ -643,6 +663,29 @@ impl MeshScene {
                         brdf_i: 0, // emitter hit brdf is always 0
                         brdf_params: Vec::new(),
                         vertex_index: start_idx as u32, // vertex index is actually light index
+                    });
+                }
+                "directional" => {
+                    let position = Self::parse_toml_vec3(
+                        light_conf
+                            .get("position")
+                            .ok_or(anyhow!("no position field found for light"))?,
+                    )?;
+                    let direction = Self::parse_toml_vec3(
+                        light_conf
+                            .get("direction")
+                            .ok_or(anyhow!("no direction field found for light"))?,
+                    )?;
+                    let radius = Self::parse_toml_f32(
+                        light_conf
+                            .get("radius")
+                            .ok_or(anyhow!("no radius field found for light"))?,
+                    )?;
+                    lights.push(Light::Directional {
+                        color,
+                        position,
+                        direction,
+                        radius,
                     });
                 }
                 _ => bail!("unknown light type"),

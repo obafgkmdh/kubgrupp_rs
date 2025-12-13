@@ -5,18 +5,29 @@ emitter_hit = "emitter.rchit"
 
 [camera]
 view = '''
-lookat 0 2 2   0 0 0    0 0 1
+lookat 0 2 2   0 0 2    0 0 1
 '''
 fov = 70
 
 [[light]]
 type = "area"
-color = [20, 20, 20]
-mesh = "square.obj"
+color = [200, 200, 200]
+mesh = "circle.obj"
 transform = '''
-scale .2 .2 .2
-translate 0 0 3
+rotate 90 1 0 0
+rotate -1 0 1 0
+scale 0.06 0.06 1
+translate 0.2 0.03 3
 '''
+emit_type = 0
+
+#[[light]]
+#type = "directional"
+#color = [10, 10, 10]
+#position = [0.2, 0.03, 3]
+#direction = [0, 0.001, -1]
+#radius = 0.1
+
 
 [[brdf]]
 name = "diffuse"
@@ -40,13 +51,25 @@ mesh = "triangle.obj"
 transform = '''
 rotate 30 0 1 0
 translate 0 0 2
+scale 1 0.5 1
 '''
 brdf = {name = "dielectric", fields = [[1.03961212, 0.231792344, 1.01046945], [0.00600069867, 0.0200179144, 10.3560653]]}
 
+# floor
 [[object]]
 mesh = "square.obj"
 transform = '''
-translate -.5 -.5 0
-scale 10 10 1
+translate -.5 -.5 1
+scale 10 5 1
 '''
-brdf = {name = "diffuse", fields = [[0.6, 0.6, 0.6]]}
+brdf = {name = "diffuse", fields = [[1, 1, 1]]}
+
+# back wall
+[[object]]
+mesh = "square.obj"
+transform = '''
+rotate 90 1 0 0
+translate -0.5 0.0 0
+scale 10 10 5
+'''
+brdf = {name = "diffuse", fields = [[1, 1, 1]]}

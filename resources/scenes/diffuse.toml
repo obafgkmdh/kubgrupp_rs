@@ -21,12 +21,29 @@ fov = 70
 
 [[light]]
 type = "area"
-color = [20, 20, 20]
+color = [0, 0, 2]
 mesh = "square.obj"
 transform = '''
 rotate 45 0 0 1
 translate 3 0 5
 '''
+
+[[light]]
+type = "directional"
+color = [20, 0, 0]
+position = [2, 5, 10]
+direction = [0, 0, -1]
+radius = 0.5
+
+[[light]]
+type = "area"
+color = [20, 20, 20]
+mesh = "circle.obj"
+transform = '''
+rotate 90 1 0 0
+translate 2 5 10
+'''
+emit_type = 0
 
 [[brdf]]
 name = "diffuse"

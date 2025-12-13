@@ -1071,14 +1071,28 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
                 light_data.extend_from_slice(bytemuck::cast_slice(&[0u32]));
                 light_data.extend_from_slice(bytemuck::cast_slice(&color.to_array()));
                 light_data.extend_from_slice(bytemuck::cast_slice(&position.to_array()));
-                light_data.extend_from_slice(bytemuck::cast_slice(&[0f32; 9]));
-            } else if let Light::Triangle { color, vertices } = light {
+                light_data.extend_from_slice(bytemuck::cast_slice(&[0f32; 10]));
+            } else if let Light::Triangle { color, vertices, emit_type } = light {
                 light_data.extend_from_slice(bytemuck::cast_slice(&[1u32]));
                 light_data.extend_from_slice(bytemuck::cast_slice(&color.to_array()));
                 light_data.extend_from_slice(bytemuck::cast_slice(&[0f32, 0f32, 0f32]));
                 for vertex in vertices {
                     light_data.extend_from_slice(bytemuck::cast_slice(&vertex.to_array()));
                 }
+                light_data.extend_from_slice(&emit_type.to_ne_bytes());
+            } else if let Light::Directional {
+                color,
+                position,
+                direction,
+                radius,
+            } = light
+            {
+                light_data.extend_from_slice(bytemuck::cast_slice(&[2u32]));
+                light_data.extend_from_slice(bytemuck::cast_slice(&color.to_array()));
+                light_data.extend_from_slice(bytemuck::cast_slice(&position.to_array()));
+                light_data.extend_from_slice(bytemuck::cast_slice(&direction.to_array()));
+                light_data.extend_from_slice(&radius.to_ne_bytes());
+                light_data.extend_from_slice(bytemuck::cast_slice(&[0f32; 6]));
             }
         }
 
