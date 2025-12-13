@@ -49,8 +49,11 @@ field = []
 name = "dielectric"
 chit_shader = "dielectric.rchit"
 [[brdf.field]]
-name = "ior"
-type = "float"
+name = "b"
+type = "vec3"
+[[brdf.field]]
+name = "c"
+type = "vec3"
 
 [[brdf]]
 name = "microfacet"
@@ -109,7 +112,7 @@ translate 3 -1 0.5
 '''
 #brdf = {name = "diffuse", fields = [[0.8, 0.2, 0.8]]}
 #brdf = {name = "mirror", fields = []}
-brdf = {name = "dielectric", fields = [2.0]}
+brdf = {name = "dielectric", fields = [[1.03961212, 0.231792344, 1.01046945], [0.00600069867, 0.0200179144, 10.3560653]]}
 #brdf = {name = "microfacet", fields = [[0.8, 0.5, 0.5], 1.8, 0.3]}
 
 [[object]]

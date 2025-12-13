@@ -1,0 +1,52 @@
+[global_shaders]
+raygen = "path.rgen"
+miss = "black.rmiss"
+emitter_hit = "emitter.rchit"
+
+[camera]
+view = '''
+lookat 0 2 2   0 0 0    0 0 1
+'''
+fov = 70
+
+[[light]]
+type = "area"
+color = [20, 20, 20]
+mesh = "square.obj"
+transform = '''
+scale .2 .2 .2
+translate 0 0 3
+'''
+
+[[brdf]]
+name = "diffuse"
+chit_shader = "diffuse.rchit"
+[[brdf.field]]
+name = "albedo"
+type = "vec3"
+
+[[brdf]]
+name = "dielectric"
+chit_shader = "dielectric.rchit"
+[[brdf.field]]
+name = "b"
+type = "vec3"
+[[brdf.field]]
+name = "c"
+type = "vec3"
+
+[[object]]
+mesh = "triangle.obj"
+transform = '''
+rotate 30 0 1 0
+translate 0 0 2
+'''
+brdf = {name = "dielectric", fields = [[1.03961212, 0.231792344, 1.01046945], [0.00600069867, 0.0200179144, 10.3560653]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -.5 -.5 0
+scale 10 10 1
+'''
+brdf = {name = "diffuse", fields = [[0.6, 0.6, 0.6]]}

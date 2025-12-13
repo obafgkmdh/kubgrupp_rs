@@ -14,7 +14,8 @@ layout(location = 0) rayPayloadInEXT RayPayload ray_info;
 hitAttributeEXT vec2 bary_coord;
 
 struct BrdfParams {
-    float ior;
+    vec3 b;
+    vec3 c;
 };
 
 layout(scalar, set = 0, binding = BRDF_PARAMS_BINDING) readonly buffer Fields {
@@ -28,10 +29,16 @@ void sample_brdf(vec3 hit_normal) {
     uint brdf_i = offsets.offsets[gl_InstanceID].brdf_i;
     BrdfParams brdf = instance_info.params[brdf_i];
 
-    float eta = 1.0 / brdf.ior;
+    float lambda_squared = pow(ray_info.wavelength, 2);
+    float eta_squared = 1;
+    for (int i = 0; i < 3; i++) {
+        eta_squared += brdf.b[i] * lambda_squared / (lambda_squared - brdf.c[i]);
+    }
+    float eta = 1 / sqrt(eta_squared);
+
     if (dot(hit_normal, -gl_WorldRayDirectionEXT) < 0.0) {
         hit_normal = -hit_normal;
-        eta = brdf.ior;
+        eta = 1 / eta;
     }
 
     vec3 reflected = reflect(gl_WorldRayDirectionEXT, hit_normal);
