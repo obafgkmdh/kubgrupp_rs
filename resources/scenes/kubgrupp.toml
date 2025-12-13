@@ -26,19 +26,6 @@ chit_shader = "diffuse.rchit"
 name = "albedo"
 type = "vec3"
 
-[[brdf]]
-name = "microfacet"
-chit_shader = "microfacet.rchit"
-[[brdf.field]]
-name = "albedo"
-type = "vec3"
-[[brdf.field]]
-name = "ior"
-type = "float"
-[[brdf.field]]
-name = "roughness"
-type = "float"
-
 [[object]]
 mesh = "cylinder.obj"
 transform = '''
@@ -90,7 +77,7 @@ rotate 30 0 0 1
 scale 2.4 2.4 2.4
 translate 2.5 -1.5 0
 '''
-brdf = {name = "microfacet", fields = [[0.226, 0.121, 0.054], 1.57, 0.05]}
+brdf = {name = "diffuse", fields = [[0.226, 0.121, 0.054]]}
 
 [[object]]
 mesh = "cube.obj"

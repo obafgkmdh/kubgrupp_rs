@@ -7,6 +7,7 @@
 
 #include "ray_common.glsl"
 #include "hit_common.glsl"
+#include "color_spaces.glsl"
 
 layout(location = 0) rayPayloadInEXT RayPayload ray_info;
 
@@ -37,7 +38,7 @@ void main() {
 
     ray_info.is_hit = true;
     ray_info.is_emitter = true;
-    ray_info.rad = light.color;
+    ray_info.rad = vec3(rgb_to_spectrum(light.color, ray_info.wavelength));
     ray_info.hit_pos = hit_pos;
     ray_info.hit_normal = normal;
     ray_info.emitter_pdf = 1.0 / lights.num_lights / area;

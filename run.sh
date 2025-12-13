@@ -1,4 +1,3 @@
 #!/bin/sh
 
-./build_shaders.py
-cargo run -- --scene-file $1
+make -j8 && cargo run -- --scene-file $1

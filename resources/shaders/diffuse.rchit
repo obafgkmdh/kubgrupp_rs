@@ -9,6 +9,7 @@
 #include "hit_common.glsl"
 #include "random.glsl"
 #include "sampling.glsl"
+#include "color_spaces.glsl"
 
 layout(location = 0) rayPayloadInEXT RayPayload ray_info;
 
@@ -30,17 +31,17 @@ void sample_brdf(vec3 hit_normal) {
     vec3 wi = cos_sample.xyz;
     float pdf = cos_sample.w;
 
-    ray_info.brdf_vals = brdf.albedo;
+    ray_info.brdf_val = rgb_to_spectrum(brdf.albedo, ray_info.wavelength);
     ray_info.brdf_pdf = pdf;
 
     ray_info.brdf_d = frame_sample(wi, hit_normal);
 }
 
-vec4 eval_brdf(vec3 wi, vec3 hit_normal) {
+vec2 eval_brdf(vec3 wi, vec3 hit_normal) {
     uint brdf_i = offsets.offsets[gl_InstanceID].brdf_i;
     BrdfParams brdf = instance_info.params[brdf_i];
     float pdf = abs(dot(wi, hit_normal)) / PI;
-    return vec4(brdf.albedo, pdf);
+    return vec2(rgb_to_spectrum(brdf.albedo, ray_info.wavelength), pdf);
 }
 
 void sample_emitter(vec3 hit_pos, vec3 hit_normal) {
@@ -50,13 +51,13 @@ void sample_emitter(vec3 hit_pos, vec3 hit_normal) {
     Light light = lights.lights[light_i];
     if (light.type == EMITTER_TYPE_POINT) {
         vec3 dir_to_light = normalize(light.position - hit_pos);
-        vec4 brdf_eval = eval_brdf(dir_to_light, hit_normal);
+        vec2 brdf_eval = eval_brdf(dir_to_light, hit_normal);
         ray_info.emitter_o = light.position;
         ray_info.emitter_pdf = 1.0 / lights.num_lights;
-        ray_info.emitter_brdf_vals = brdf_eval.xyz;
-        ray_info.emitter_brdf_pdf = brdf_eval.w;
+        ray_info.emitter_brdf_val = brdf_eval[0];
+        ray_info.emitter_brdf_pdf = brdf_eval[1];
         ray_info.emitter_normal = -dir_to_light;
-        ray_info.rad = light.color;
+        ray_info.rad = vec3(rgb_to_spectrum(light.color, ray_info.wavelength));
     } else if (light.type == EMITTER_TYPE_AREA) {
         // sample random point on triangle 
         float s = rnd(ray_info.seed);
@@ -76,13 +77,13 @@ void sample_emitter(vec3 hit_pos, vec3 hit_normal) {
             a * light.vertices[0] + b * light.vertices[1] + c * light.vertices[2];
 
         vec3 dir_to_light = normalize(ray_info.emitter_o - hit_pos);
-        vec4 brdf_eval = eval_brdf(dir_to_light, hit_normal);
+        vec2 brdf_eval = eval_brdf(dir_to_light, hit_normal);
 
         ray_info.emitter_pdf = 1.0 / lights.num_lights / area;
-        ray_info.emitter_brdf_vals = brdf_eval.xyz;
-        ray_info.emitter_brdf_pdf = brdf_eval.w;
+        ray_info.emitter_brdf_val = brdf_eval[0];
+        ray_info.emitter_brdf_pdf = brdf_eval[1];
         ray_info.emitter_normal = normal;
-        ray_info.rad = light.color;
+        ray_info.rad = vec3(rgb_to_spectrum(light.color, ray_info.wavelength));
     }
 }
 

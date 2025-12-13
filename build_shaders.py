@@ -29,3 +29,4 @@ for filename in os.listdir(shader_dir):
             print(f"Compiled: {shader_path} -> {output_path}")
         except subprocess.CalledProcessError as e:
             print(f"Error compiling {shader_path}: {e}")
+            exit(1)
