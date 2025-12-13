@@ -16,6 +16,7 @@ enum Direction {
     Right = 0x8,
     Up = 0x10,
     Down = 0x20,
+    Escape = 0x40,
 }
 
 pub struct Camera {
@@ -94,7 +95,7 @@ impl Camera {
         key_movements.insert(
             KeyCode::Escape,
             (
-                Direction::Up,
+                Direction::Escape,
                 Box::new(|_: &Vec3| panic!()),
             ),
         );
