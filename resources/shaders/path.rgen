@@ -10,7 +10,7 @@
 #include "random.glsl"
 #include "color_spaces.glsl"
 
-#define MIS
+// #define MIS
 
 layout(location = 0) rayPayloadEXT RayPayload ray_info;
 
@@ -78,7 +78,9 @@ void main() {
             // emitter hits terminate paths
             if (ray_info.is_emitter) {
                 if (specular_reflection) {
-                    value += throughput * ray_info.rad.x;
+                    if (dot(normalize(ray_d), ray_info.hit_normal) >= 0) {
+                        value += throughput * ray_info.rad.x;
+                    }
                 } else {
 #ifdef MIS
                     vec3 dist_vec = ray_info.hit_pos - ray_o;

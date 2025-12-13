@@ -59,7 +59,7 @@ void sample_emitter(vec3 hit_pos, vec3 hit_normal) {
         ray_info.emitter_normal = -dir_to_light;
         ray_info.rad = vec3(rgb_to_spectrum(light.color, ray_info.wavelength));
     } else if (light.type == EMITTER_TYPE_AREA) {
-        // sample random point on triangle 
+        // sample random point on triangle
         float s = rnd(ray_info.seed);
         float t = sqrt(rnd(ray_info.seed));
 
@@ -77,13 +77,16 @@ void sample_emitter(vec3 hit_pos, vec3 hit_normal) {
             a * light.vertices[0] + b * light.vertices[1] + c * light.vertices[2];
 
         vec3 dir_to_light = normalize(ray_info.emitter_o - hit_pos);
-        vec2 brdf_eval = eval_brdf(dir_to_light, hit_normal);
+        float angle_to_light = dot(dir_to_light, normal);
+        if (angle_to_light >= 0) {
+            vec2 brdf_eval = eval_brdf(dir_to_light, hit_normal);
 
-        ray_info.emitter_pdf = 1.0 / lights.num_lights / area;
-        ray_info.emitter_brdf_val = brdf_eval[0];
-        ray_info.emitter_brdf_pdf = brdf_eval[1];
-        ray_info.emitter_normal = normal;
-        ray_info.rad = vec3(rgb_to_spectrum(light.color, ray_info.wavelength));
+            ray_info.emitter_pdf = 1.0 / lights.num_lights / area;
+            ray_info.emitter_brdf_val = brdf_eval[0];
+            ray_info.emitter_brdf_pdf = brdf_eval[1];
+            ray_info.emitter_normal = normal;
+            ray_info.rad = vec3(rgb_to_spectrum(light.color, ray_info.wavelength));
+        }
     }
 }
 
