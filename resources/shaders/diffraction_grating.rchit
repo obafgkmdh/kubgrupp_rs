@@ -87,18 +87,19 @@ void sample_brdf(vec3 hit_normal) {
     vec3 wi_along = dot(gl_WorldRayDirectionEXT, along_grating) * along_grating;
     vec3 wi_across = gl_WorldRayDirectionEXT - wi_along;
     float magnitude_across = length(wi_across);
-    vec3 reflected = reflect(normalize(wi_across), hit_normal);
-
-    float cos_i = dot(-normalize(wi_across), hit_normal);
-    float sin_i = sqrt(1 - cos_i * cos_i);
-    float sin_o = sin_i - lobe * wavelength / brdf.period;
-    float cos_o = sqrt(1 - sin_o * sin_o);
-    if (isnan(sin_i) || isnan(cos_o)) {
-        ray_info.brdf_val = 0;
-        return;
+    if (magnitude_across > 0) {
+        float cos_i = dot(-normalize(wi_across), hit_normal);
+        float sin_i = sqrt(1 - cos_i * cos_i);
+        float sin_o = sin_i - lobe * wavelength / brdf.period;
+        float cos_o = sqrt(1 - sin_o * sin_o);
+        if (isnan(cos_o)) {
+            ray_info.brdf_val = 0;
+            return;
+        }
+        ray_info.brdf_d = across_grating * sin_o + hit_normal * cos_o + wi_along;
+    } else {
+        ray_info.brdf_d = reflect(gl_WorldRayDirectionEXT, hit_normal);
     }
-    vec3 refl_across = magnitude_across * ((reflected - hit_normal * cos_i) * sin_o / sin_i + hit_normal * cos_o);
-    ray_info.brdf_d = refl_across + wi_along;
 }
 
 void sample_emitter(vec3 hit_pos, vec3 hit_normal) {

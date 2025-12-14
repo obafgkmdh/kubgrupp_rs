@@ -12,6 +12,7 @@
 
 #define MIS
 #define SAMPLE_EMITTER
+// #define DEBUG_CENTER_DOT
 
 layout(location = 0) rayPayloadEXT RayPayload ray_info;
 
@@ -36,9 +37,16 @@ void main() {
     vec3 result = vec3(0);
 
     for (uint i = 0; i < SPP; i++) {
+#ifdef DEBUG_CENTER_DOT
+        if (abs(x - 0.5) < 0.002 && abs(y - 0.5) < 0.002) {
+            result = vec3(SPP);
+            break;
+        }
+#endif
         vec2 jitter = vec2(rnd(ray_info.seed), rnd(ray_info.seed));
         const vec2 pixel_center = vec2(gl_LaunchIDEXT.xy) + jitter;
         const vec2 in_uv = pixel_center / vec2(gl_LaunchSizeEXT.xy);
+        // stratified sampling of wavelengths
         float wavelength = (i + rnd(ray_info.seed)) / SPP * rangeWavelengths + minWavelength;
         ray_info.wavelength = wavelength;
         const vec3 wavelength_rgb = max(vec3(0), spectrumToRgb(ray_info.wavelength));
