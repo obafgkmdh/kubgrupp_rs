@@ -1,9 +1,10 @@
 rchit := $(patsubst resources/shaders/%,resources/shaders/spv/%.spv,$(wildcard resources/shaders/*.rchit))
 rmiss := $(patsubst resources/shaders/%,resources/shaders/spv/%.spv,$(wildcard resources/shaders/*.rmiss))
 rgen := $(patsubst resources/shaders/%,resources/shaders/spv/%.spv,$(wildcard resources/shaders/*.rgen))
+rint := $(patsubst resources/shaders/%,resources/shaders/spv/%.spv,$(wildcard resources/shaders/*.rint))
 glsl := $(wildcard resources/shaders/*.glsl)
 
-shaders := $(rchit) $(rmiss) $(rgen)
+shaders := $(rchit) $(rmiss) $(rgen) $(rint)
 
 all: $(shaders)
 

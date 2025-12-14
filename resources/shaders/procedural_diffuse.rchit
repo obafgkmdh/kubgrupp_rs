@@ -15,10 +15,10 @@ hitAttributeEXT vec3 hit_normal;
 
 vec3 albedo = vec3(0.8, 0.3, 0.3);
 
-vec4 eval_brdf(vec3 wi, vec3 normal) {
+vec2 eval_brdf(vec3 wi, vec3 normal) {
     float cos_theta = max(0.0, dot(wi, normal));
     float pdf = cos_theta / PI;
-    return vec4(albedo, pdf);
+    return vec2(rgb_to_spectrum(albedo, ray_info.wavelength), pdf);
 }
 
 void sample_brdf(vec3 normal) {
@@ -30,12 +30,12 @@ void sample_brdf(vec3 normal) {
 
 void sample_emitter(vec3 pos, vec3 normal) {
     EmitterSample light = sample_light(pos, ray_info.seed, ray_info.wavelength);
-    vec4 brdf_eval = eval_brdf(light.direction, normal);
+    vec2 brdf_eval = eval_brdf(light.direction, normal);
 
     ray_info.emitter_o = light.position;
     ray_info.emitter_pdf = light.pdf;
-    ray_info.emitter_brdf_vals = brdf_eval.xyz;
-    ray_info.emitter_brdf_pdf = brdf_eval.w;
+    ray_info.emitter_brdf_val = brdf_eval[0];
+    ray_info.emitter_brdf_pdf = brdf_eval[1];
     ray_info.emitter_normal = light.normal;
     ray_info.rad = light.radiance;
 }
