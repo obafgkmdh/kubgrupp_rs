@@ -16,6 +16,7 @@ hitAttributeEXT vec2 bary_coord;
 struct BrdfParams {
     float period;
     float height;
+    vec3 towards;
 };
 
 layout(scalar, set = 0, binding = BRDF_PARAMS_BINDING) readonly buffer Fields {
@@ -47,6 +48,17 @@ void sample_brdf(vec3 hit_normal) {
     uint brdf_i = offsets.offsets[gl_InstanceID].brdf_i;
     BrdfParams brdf = instance_info.params[brdf_i];
 
+    // get direction of diffraction grating
+    vec3 towards = normalize(brdf.towards);
+    vec3 towards_along_normal = dot(towards, hit_normal) * hit_normal;
+    vec3 towards_perp_normal = towards - towards_along_normal;
+    if (length(towards_perp_normal) == 0.0) {
+        ray_info.brdf_val = 0;
+        return;
+    }
+    vec3 across_grating = normalize(towards_perp_normal);
+    vec3 along_grating = cross(hit_normal, across_grating);
+
     float wavelength = ray_info.wavelength;
     float x = 4 * PI * brdf.height / wavelength;
 
@@ -72,9 +84,12 @@ void sample_brdf(vec3 hit_normal) {
         lobe = -lobe;
     }
 
-    vec3 reflected = reflect(gl_WorldRayDirectionEXT, hit_normal);
+    vec3 wi_along = dot(gl_WorldRayDirectionEXT, along_grating) * along_grating;
+    vec3 wi_across = gl_WorldRayDirectionEXT - wi_along;
+    float magnitude_across = length(wi_across);
+    vec3 reflected = reflect(normalize(wi_across), hit_normal);
 
-    float cos_i = dot(-gl_WorldRayDirectionEXT, hit_normal);
+    float cos_i = dot(-normalize(wi_across), hit_normal);
     float sin_i = sqrt(1 - cos_i * cos_i);
     float sin_o = sin_i - lobe * wavelength / brdf.period;
     float cos_o = sqrt(1 - sin_o * sin_o);
@@ -82,7 +97,8 @@ void sample_brdf(vec3 hit_normal) {
         ray_info.brdf_val = 0;
         return;
     }
-    ray_info.brdf_d = reflected * sin_o / sin_i - hit_normal * (cos_i * sin_o / sin_i - cos_o);
+    vec3 refl_across = magnitude_across * ((reflected - hit_normal * cos_i) * sin_o / sin_i + hit_normal * cos_o);
+    ray_info.brdf_d = refl_across + wi_along;
 }
 
 void sample_emitter(vec3 hit_pos, vec3 hit_normal) {

@@ -11,13 +11,13 @@ fov = 70
 
 [[light]]
 type = "area"
-color = [0.6, 0.6, 1]
+color = [0.7, 0.7, 1]
 mesh = "square.obj"
 transform = '''
 rotate 180 0 1 0
 scale 1 1 1
-translate 0 0.1 4.8
 rotate 12 1 0 0
+translate 0 0.1 4.8
 '''
 emit_type = 1
 
@@ -29,7 +29,7 @@ transform = '''
 scale 0.08 1 0.08
 rotate 180 1 0 0
 rotate 95 1 0 0
-translate 0.3 0.5 4.8
+translate 0.3 0.5 3.8
 '''
 emit_type = 0
 
@@ -50,6 +50,9 @@ type = "float"
 [[brdf.field]]
 name = "height"
 type = "float"
+[[brdf.field]]
+name = "towards"
+type = "vec3"
 
 [[object]]
 mesh = "circle.obj"
@@ -57,7 +60,7 @@ transform = '''
 rotate 90 1 0 0
 translate 0 0.16 0.001
 '''
-brdf = {name = "diffraction_grating", fields = [740, 110]}
+brdf = {name = "diffraction_grating", fields = [740, 110, [0, 1, 0]]}
 
 [[object]]
 mesh = "cube.obj"
