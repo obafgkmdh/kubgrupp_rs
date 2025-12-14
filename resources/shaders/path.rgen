@@ -11,7 +11,7 @@
 #include "color_spaces.glsl"
 
 #define MIS
-// #define SAMPLE_EMITTER
+#define SAMPLE_EMITTER
 
 layout(location = 0) rayPayloadEXT RayPayload ray_info;
 
@@ -78,24 +78,25 @@ void main() {
 
             // emitter hits terminate paths
             if (ray_info.is_emitter) {
+                float mis_weight = 1;
 #ifdef SAMPLE_EMITTER
                 if (!specular_reflection) {
 #ifdef MIS
                     vec3 dist_vec = ray_info.hit_pos - ray_o;
                     float dist_sq = dot(dist_vec, dist_vec);
                     float emitter_pdf = ray_info.emitter_pdf * dist_sq / abs(dot(ray_info.hit_normal, ray_d));
-                    float mis_weight = power_heuristic(prev_brdf_pdf, emitter_pdf);
-                    //result += throughput * mis_weight * ray_info.rad / dist_sq;
-                    value += throughput * mis_weight * ray_info.rad.x;
+                    mis_weight = power_heuristic(prev_brdf_pdf, emitter_pdf);
+                    if (isnan(mis_weight)) {
+                        mis_weight = 0;
+                    }
 #endif
-                    break;
                 }
 #endif
                 if (ray_info.emitter_type == 1.0 && dot(ray_d, ray_info.hit_normal) >= 0.0) {
-                    value += throughput * ray_info.rad.x;
+                    value += throughput * mis_weight * ray_info.rad.x;
                 }
                 if (ray_info.emitter_type == 0.0 && dot(ray_d, ray_info.hit_normal) >= 0.995) {
-                    value += throughput * ray_info.rad.x;
+                    value += throughput * mis_weight * ray_info.rad.x;
                 }
                 break;
             }
@@ -150,9 +151,14 @@ void main() {
                 float g = cos_obj * cos_em / emitter_dist;
                 //float g = cos_em / emitter_dist;
                 //float g = cos_obj * cos_em ;
+                float mis_weight = 1;
 #ifdef MIS
                 float converted_pdf = emitter_pdf * emitter_dist / cos_em;
-                float mis_weight = power_heuristic(converted_pdf, emitter_brdf_pdf);
+                mis_weight = power_heuristic(converted_pdf, emitter_brdf_pdf);
+                if (isnan(mis_weight)) {
+                    mis_weight = 0;
+                }
+#endif
                 value +=
                     throughput
                     * mis_weight
@@ -160,14 +166,6 @@ void main() {
                     * emitter_rad.x
                     * emitter_brdf_val
                     / emitter_pdf;
-#else
-                value +=
-                    throughput
-                    * g * v
-                    * emitter_rad.x
-                    * emitter_brdf_val
-                    / emitter_pdf;
-#endif
             }
 #endif
 
