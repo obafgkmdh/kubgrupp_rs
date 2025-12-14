@@ -14,13 +14,31 @@ layout(location = 0) rayPayloadInEXT RayPayload ray_info;
 hitAttributeEXT vec2 bary_coord;
 
 struct BrdfParams {
-    vec3 b;
-    vec3 c;
+    float period;
+    float height;
 };
 
 layout(scalar, set = 0, binding = BRDF_PARAMS_BINDING) readonly buffer Fields {
     BrdfParams params[];
 } instance_info;
+
+float bessel(int order, float x) {
+    float ans = 0;
+    float sgn = 1;
+    float denom = 1;
+    for (int i = 2; i <= order; i++) {
+        denom *= i;
+    }
+    float numer = pow(x / 2, order);
+    float x22 = x * x / 4;
+    for (int m = 0; m < 5; m++) {
+        ans += sgn * numer / denom;
+        numer *= x22;
+        denom *= (m + 1) * (m + 1 + order);
+        sgn *= -1;
+    }
+    return ans;
+}
 
 void sample_brdf(vec3 hit_normal) {
     ray_info.brdf_val = 1;
@@ -30,27 +48,44 @@ void sample_brdf(vec3 hit_normal) {
     BrdfParams brdf = instance_info.params[brdf_i];
 
     float wavelength = ray_info.wavelength;
-    float lambda_squared = pow(wavelength / 1000, 2);
-    float eta_squared = 1;
-    for (int i = 0; i < 3; i++) {
-        eta_squared += brdf.b[i] * lambda_squared / (lambda_squared - brdf.c[i]);
-    }
-    float eta = 1 / sqrt(eta_squared);
+    float x = brdf.height * PI / wavelength;
 
-    if (dot(hit_normal, -gl_WorldRayDirectionEXT) < 0.0) {
-        hit_normal = -hit_normal;
-        eta = 1 / eta;
+    float intensities[7];
+    float total = 0;
+    for (int i = 0; i < 7; i++) {
+        float b = bessel(i+1, x);
+        intensities[i] = b * b;
+        total += intensities[i];
+    }
+    float r = rnd(ray_info.seed) * 2 - 1;
+    float cdf = 0;
+    float pdf = 0;
+    int lobe = 0;
+    for (int i = 0; i < 7; i++) {
+        float p = intensities[i] / total;
+        cdf += p;
+        if (abs(r) < cdf) {
+            pdf = p;
+            lobe = i + 1;
+            break;
+        }
+    }
+    pdf = pdf / 2;
+    if (r < 0) {
+        lobe = -lobe;
     }
 
     vec3 reflected = reflect(gl_WorldRayDirectionEXT, hit_normal);
-    float f = fresnel(abs(dot(reflected, hit_normal)), eta);
 
-    float r = rnd(ray_info.seed);
-    if (r < f) {
-        ray_info.brdf_d = normalize(reflected);
-    } else {
-        ray_info.brdf_d = normalize(refract(gl_WorldRayDirectionEXT, hit_normal, eta));
+    float cos_i = dot(gl_WorldRayDirectionEXT, hit_normal);
+    float sin_i = sqrt(1 - cos_i * cos_i);
+    float sin_o = sin_i - lobe * wavelength / brdf.height;
+    float cos_o = sqrt(1 - sin_o * sin_o);
+    if (isnan(sin_i) || isnan(cos_o) || sin_o < 0 || false) {
+        ray_info.brdf_d = reflected;
+        return;
     }
+    ray_info.brdf_d = reflected * cos_o / cos_i - hit_normal * (sin_i * cos_o / cos_i + sin_o);
 }
 
 void sample_emitter(vec3 hit_pos, vec3 hit_normal) {

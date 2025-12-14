@@ -86,7 +86,7 @@ void sample_emitter(vec3 hit_pos, vec3 hit_normal) {
         vec3 dir_to_light = normalize(ray_info.emitter_o - hit_pos);
         float cos_angle_to_light = dot(dir_to_light, normal);
         bool visible = false;
-        if (light.emit_type == 0.0 && cos_angle_to_light >= 0.995) {
+        if (light.emit_type == 0.0 && cos_angle_to_light >= 0.996) {
             visible = true;
         } else if (light.emit_type == 1.0 && cos_angle_to_light >= 0.0) {
             visible = true;

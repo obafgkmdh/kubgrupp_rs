@@ -15,7 +15,7 @@
 
 layout(location = 0) rayPayloadEXT RayPayload ray_info;
 
-const uint MAX_DEPTH = 16;
+const uint MAX_DEPTH = 20;
 const uint SPP = 64;
 
 float power_heuristic(float a, float b) {
@@ -95,7 +95,7 @@ void main() {
                 if (ray_info.emitter_type == 1.0 && dot(ray_d, ray_info.hit_normal) >= 0.0) {
                     value += throughput * mis_weight * ray_info.rad.x;
                 }
-                if (ray_info.emitter_type == 0.0 && dot(ray_d, ray_info.hit_normal) >= 0.995) {
+                if (ray_info.emitter_type == 0.0 && dot(ray_d, ray_info.hit_normal) >= 0.996) {
                     value += throughput * mis_weight * ray_info.rad.x;
                 }
                 break;
@@ -173,7 +173,7 @@ void main() {
 
             // russian roulette
             if (depth >= 3) {
-                const float cont_prob = 0.9;
+                const float cont_prob = 0.90;
                 if (rnd(ray_info.seed) < cont_prob) {
                     throughput *= 1 / cont_prob;
                 } else {
