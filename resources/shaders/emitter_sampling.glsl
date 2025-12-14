@@ -59,21 +59,20 @@ EmitterSample sample_light(vec3 hit_pos, inout uint seed, inout float wavelength
     } else if (light.type == EMITTER_TYPE_DIRECTIONAL) {
         vec3 light_dir = normalize(light.data[0]);
         vec3 dir_to_light = -light_dir;
+        float radius = light.data[1].r;
 
         vec3 to_hit = hit_pos - light.position;
         float along_axis = dot(to_hit, light_dir);
         vec3 perpendicular = to_hit - along_axis * light_dir;
         float perp_dist = length(perpendicular);
-        float radius = light.data[1].r;
+        bool in_beam = along_axis > 0.0 && perp_dist <= radius;
 
         vec3 emitter_pos = light.position + perpendicular;
         float dist_sq = max(along_axis * along_axis, 1.0);
 
-        bool in_beam = along_axis > 0.0 && perp_dist <= radius;
-
         result.position = emitter_pos;
-        result.direction = -dir_to_light;
-        result.normal = -dir_to_light;
+        result.direction = dir_to_light;
+        result.normal = light_dir;
         result.radiance = in_beam ? vec3(rgb_to_spectrum(light.color, wavelength)) * dist_sq : vec3(0);
         result.pdf = 1.0 / lights.num_lights;
     }
