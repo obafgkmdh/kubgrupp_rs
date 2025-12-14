@@ -48,44 +48,41 @@ void sample_brdf(vec3 hit_normal) {
     BrdfParams brdf = instance_info.params[brdf_i];
 
     float wavelength = ray_info.wavelength;
-    float x = brdf.height * PI / wavelength;
+    float x = 4 * PI * brdf.height / wavelength;
 
-    float intensities[7];
+    float intensities[9];
     float total = 0;
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < 9; i++) {
         float b = bessel(i+1, x);
         intensities[i] = b * b;
         total += intensities[i];
     }
     float r = rnd(ray_info.seed) * 2 - 1;
     float cdf = 0;
-    float pdf = 0;
     int lobe = 0;
-    for (int i = 0; i < 7; i++) {
-        float p = intensities[i] / total;
-        cdf += p;
+    for (int i = 0; i < 9; i++) {
+        float p = intensities[i];
+        cdf += 2 * p;
         if (abs(r) < cdf) {
-            pdf = p;
             lobe = i + 1;
             break;
         }
     }
-    pdf = pdf / 2;
     if (r < 0) {
         lobe = -lobe;
     }
 
     vec3 reflected = reflect(gl_WorldRayDirectionEXT, hit_normal);
 
-    float cos_i = dot(gl_WorldRayDirectionEXT, hit_normal);
+    float cos_i = dot(-gl_WorldRayDirectionEXT, hit_normal);
     float sin_i = sqrt(1 - cos_i * cos_i);
-    float sin_o = sin_i - lobe * wavelength / brdf.height;
+    float sin_o = sin_i - lobe * wavelength / brdf.period;
     float cos_o = sqrt(1 - sin_o * sin_o);
-    if (isnan(sin_i) || isnan(cos_o) || sin_o < 0 || false) {
-        ray_info.brdf_d = reflected;
+    if (isnan(sin_i) || isnan(cos_o)) {
+        ray_info.brdf_val = 0;
         return;
     }
-    ray_info.brdf_d = reflected * cos_o / cos_i - hit_normal * (sin_i * cos_o / cos_i + sin_o);
+    ray_info.brdf_d = reflected * sin_o / sin_i - hit_normal * (cos_i * sin_o / sin_i - cos_o);
 }
 
 void sample_emitter(vec3 hit_pos, vec3 hit_normal) {
@@ -113,11 +110,23 @@ void main() {
         + c.normal * full_bary_coord.z;
     hit_normal = normalize(gl_ObjectToWorldEXT * vec4(hit_normal, 0));
 
+    vec3 edge1 = b.position - a.position;
+    vec3 edge2 = c.position - a.position;
+    vec3 face_normal = normalize(cross(edge1, edge2));
+    face_normal = normalize(gl_ObjectToWorldEXT * vec4(face_normal, 0));
+
+    bool is_backface = dot(gl_WorldRayDirectionEXT, face_normal) > 0.0;
+    if (is_backface) {
+        hit_normal = -hit_normal;
+        face_normal = -face_normal;
+    }
+
     sample_emitter(hit_pos, hit_normal);
     sample_brdf(hit_normal);
 
     ray_info.hit_pos = hit_pos;
     ray_info.hit_normal = hit_normal;
+    ray_info.hit_geo_normal = hit_normal;
     ray_info.is_hit = true;
     ray_info.is_emitter = false;
     ray_info.is_specular = true;

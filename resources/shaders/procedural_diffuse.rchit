@@ -29,7 +29,7 @@ void sample_brdf(vec3 normal) {
 }
 
 void sample_emitter(vec3 pos, vec3 normal) {
-    EmitterSample light = sample_light(pos, ray_info.seed);
+    EmitterSample light = sample_light(pos, ray_info.seed, ray_info.wavelength);
     vec4 brdf_eval = eval_brdf(light.direction, normal);
 
     ray_info.emitter_o = light.position;

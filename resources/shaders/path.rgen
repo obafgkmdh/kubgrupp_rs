@@ -15,8 +15,8 @@
 
 layout(location = 0) rayPayloadEXT RayPayload ray_info;
 
-const uint MAX_DEPTH = 20;
-const uint SPP = 16;
+const uint MAX_DEPTH = 15;
+const uint SPP = 8;
 
 float power_heuristic(float a, float b) {
     float t = a * a;
@@ -39,7 +39,7 @@ void main() {
         const vec2 in_uv = pixel_center / vec2(gl_LaunchSizeEXT.xy);
         const float wavelength = rnd(ray_info.seed) * rangeWavelengths + minWavelength;
         ray_info.wavelength = wavelength;
-        const vec3 wavelength_rgb = max(vec3(0), spectrumToRgb(wavelength));
+        const vec3 wavelength_rgb = max(vec3(0), spectrumToRgb(ray_info.wavelength));
 
         vec2 d = in_uv * 2.0 - 1.0;
 
@@ -92,10 +92,10 @@ void main() {
 #endif
                 }
 #endif
-                if (ray_info.emitter_type == 1.0 && dot(-ray_d, ray_info.hit_geo_normal) >= 0.0) {
+                if (ray_info.emitter_type == 1.0 && dot(-ray_d, ray_info.hit_normal) >= 0.0) {
                     value += throughput * mis_weight * ray_info.rad.x;
                 }
-                if (ray_info.emitter_type == 0.0 && dot(-ray_d, ray_info.hit_geo_normal) >= 0.996) {
+                if (ray_info.emitter_type == 0.0 && abs(dot(-ray_d, ray_info.hit_normal)) >= 0.995) {
                     value += throughput * mis_weight * ray_info.rad.x;
                 }
                 break;
@@ -165,6 +165,10 @@ void main() {
 #endif
 
             throughput *= brdf_val;
+
+            if (throughput == 0) {
+                break;
+            }
 
             // russian roulette
             if (depth >= 3) {

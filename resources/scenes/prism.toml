@@ -5,7 +5,7 @@ emitter_hit = "emitter.rchit"
 
 [camera]
 view = '''
-lookat 0 2 2   0 0 2    0 0 1
+lookat 0 2 2.2   0 0 2.2    0 0 1
 '''
 fov = 70
 
@@ -15,20 +15,23 @@ color = [1, 1, 1]
 mesh = "square.obj"
 transform = '''
 rotate 180 0 1 0
-scale 0.17 0.17 1
+scale 0.16 0.16 1
 translate -0.8 0 3.8
+translate 0 0 -2
+rotate -90 0 1 0
+translate 0 0 2
 '''
 emit_type = 1
 
 [[light]]
 type = "area"
-color = [100, 100, 100]
+color = [200, 200, 200]
 mesh = "circle.obj"
 transform = '''
 rotate -90 1 0 0
 rotate -1 0 1 0
-scale 0.06 0.06 1
-translate 0.25 0.03 3.2
+scale 0.04 0.04 1
+translate 0.26 0.03 3
 translate 0 0 -2
 rotate -90 0 1 0
 translate 0 0 2
@@ -64,7 +67,7 @@ type = "vec3"
 mesh = "triangle.obj"
 transform = '''
 rotate 30 0 1 0
-translate 0 0 2
+translate 0 0 2.1
 scale 1 0.7 1
 translate 0 0 -2
 rotate -90 0 1 0
@@ -84,26 +87,26 @@ translate 0 0 2
 '''
 brdf = {name = "diffuse", fields = [[1, 1, 1]]}
 
-# new floor
-[[object]]
-mesh = "square.obj"
-transform = '''
-translate -.5 -.5 1
-scale 5 3 1
-'''
-brdf = {name = "diffuse", fields = [[1, 1, 1]]}
+## new floor
+#[[object]]
+#mesh = "square.obj"
+#transform = '''
+#translate -.5 -.5 1
+#scale 5 3 1
+#'''
+#brdf = {name = "diffuse", fields = [[1, 1, 1]]}
 
-# new other floor
-[[object]]
-mesh = "square.obj"
-transform = '''
-translate -.5 -.5 1
-scale 5 3 1
-translate 0 0 -2
-rotate 90 0 1 0
-translate -1 0 2
-'''
-brdf = {name = "diffuse", fields = [[1, 1, 1]]}
+## new other floor
+#[[object]]
+#mesh = "square.obj"
+#transform = '''
+#translate -.5 -.5 1
+#scale 5 3 1
+#translate 0 0 -2
+#rotate 90 0 1 0
+#translate -1 0 2
+#'''
+#brdf = {name = "diffuse", fields = [[1, 1, 1]]}
 
 
 # back wall
@@ -113,8 +116,5 @@ transform = '''
 rotate -90 1 0 0
 translate -0.5 0.0 1
 scale 5 10 5
-translate 0 0 -2
-rotate -90 0 1 0
-translate 0 0 2
 '''
 brdf = {name = "diffuse", fields = [[1, 1, 1]]}
