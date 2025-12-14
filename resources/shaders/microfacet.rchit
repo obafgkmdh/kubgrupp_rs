@@ -33,7 +33,7 @@ float g1(vec3 wv, vec3 wh, vec3 hit_normal, float roughness) {
     return dot(wv, wh) / cos_t > 0 ? val : 0.0;
 }
 
-vec4 eval_brdf(vec3 wi, vec3 hit_normal, float ks) {
+vec2 eval_brdf(vec3 wi, vec3 hit_normal, float ks) {
     uint brdf_i = offsets.offsets[gl_InstanceID].brdf_i;
     BrdfParams brdf = instance_info.params[brdf_i];
 
@@ -48,8 +48,8 @@ vec4 eval_brdf(vec3 wi, vec3 hit_normal, float ks) {
     float d = pdf_beckmann(cos_wh, brdf.roughness);
     float jh = 1 / (4 * dot(wh, wi));
     float pdf = ks * d * jh + (1 - ks) * cos_wi / PI;
-    vec3 vals = brdf.albedo / PI + ks * d * f * g / (4 * cos_wi * cos_wo * cos_wh);
-    return vec4(vals, pdf);
+    float val = rgb_to_spectrum(brdf.albedo, ray_info.wavelength) / PI + ks * d * f * g / (4 * cos_wi * cos_wo * cos_wh);
+    return vec2(val, pdf);
 }
 
 void sample_brdf(vec3 hit_normal, float ks) {
@@ -68,19 +68,19 @@ void sample_brdf(vec3 hit_normal, float ks) {
         ray_info.brdf_d = frame_sample(cos_sample.xyz, hit_normal);
     }
 
-    vec4 brdf_eval = eval_brdf(ray_info.brdf_d, hit_normal, ks);
-    ray_info.brdf_pdf = brdf_eval.w;
-    ray_info.brdf_vals = brdf_eval.xyz * dot(ray_info.brdf_d, hit_normal) / brdf_eval.w;
+    vec2 brdf_eval = eval_brdf(ray_info.brdf_d, hit_normal, ks);
+    ray_info.brdf_pdf = brdf_eval[1];
+    ray_info.brdf_val = brdf_eval[0] * dot(ray_info.brdf_d, hit_normal) / brdf_eval[1];
 }
 
 void sample_emitter(vec3 hit_pos, vec3 hit_normal, float ks) {
     EmitterSample light = sample_light(hit_pos, ray_info.seed, ray_info.wavelength);
-    vec4 brdf_eval = eval_brdf(light.direction, hit_normal, ks);
+    vec2 brdf_eval = eval_brdf(light.direction, hit_normal, ks);
 
     ray_info.emitter_o = light.position;
     ray_info.emitter_pdf = light.pdf;
-    ray_info.emitter_brdf_vals = brdf_eval.xyz;
-    ray_info.emitter_brdf_pdf = brdf_eval.w;
+    ray_info.emitter_brdf_val = brdf_eval[0];
+    ray_info.emitter_brdf_pdf = brdf_eval[1];
     ray_info.emitter_normal = light.normal;
     ray_info.rad = light.radiance;
 }
