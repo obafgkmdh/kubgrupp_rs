@@ -9,9 +9,10 @@ lookat 1.5 4.99 2.8   -2 -0.5 1    0 0 1
 '''
 fov = 70
 
+# ceiling light
 [[light]]
 type = "area"
-color = [0.9, 0.9, 0.9]
+color = [0.06, 0.06, 0.06]
 mesh = "square.obj"
 transform = '''
 rotate 180 0 1 0
@@ -19,10 +20,12 @@ scale 1 1 1
 translate 0.1 1 4.8
 '''
 emit_type = 1
+spectra = "d65"
 
+# "directional" light
 [[light]]
 type = "area"
-color = [80, 80, 80]
+color = [5, 5, 5]
 mesh = "circle.obj"
 transform = '''
 scale 0.2 0.2 0.2
@@ -133,15 +136,5 @@ transform = '''
 translate -.5 -.5 0
 scale 8 10 1
 translate 0 0 5
-'''
-brdf = {name = "diffuse", fields = [[0.9, 0.9, 0.9]]}
-
-# other back wall
-[[object]]
-mesh = "square.obj"
-transform = '''
-rotate -90 1 0 0
-translate -0.5 0.5 1
-scale 10 10 5
 '''
 brdf = {name = "diffuse", fields = [[0.9, 0.9, 0.9]]}
