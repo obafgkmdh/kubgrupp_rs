@@ -8,7 +8,6 @@
 #include "ray_common.glsl"
 #include "hit_common.glsl"
 #include "color_spaces.glsl"
-#include "spectra.glsl"
 
 layout(location = 0) rayPayloadInEXT RayPayload ray_info;
 
@@ -50,7 +49,7 @@ void main() {
         int spectral_bucket_t = int(ceil(spectral_bucket)+.5f);
         int spectral_bucket_b = int(floor(spectral_bucket)+.5f);
         float weight = spectral_bucket - spectral_bucket_b;
-        float spectral_radiance = spectra_d65[spectral_bucket_t] * weight + spectra_d65[spectral_bucket_b] * (1.0f - weight);
+        float spectral_radiance = light.spectra[spectral_bucket_t] * weight + light.spectra[spectral_bucket_b] * (1.0f - weight);
 
         ray_info.is_emitter = true;
         ray_info.rad = vec3(spectral_radiance * light.color[0]);

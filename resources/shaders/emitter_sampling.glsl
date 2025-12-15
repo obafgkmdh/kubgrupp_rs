@@ -1,5 +1,4 @@
 #include "color_spaces.glsl"
-#include "spectra.glsl"
 
 struct EmitterSample {
     vec3 position;
@@ -57,7 +56,7 @@ EmitterSample sample_light(vec3 hit_pos, inout uint seed, inout float wavelength
         int spectral_bucket_t = int(ceil(spectral_bucket)+.5f);
         int spectral_bucket_b = int(floor(spectral_bucket)+.5f);
         float weight = spectral_bucket - spectral_bucket_b;
-        float spectral_radiance = spectra_d65[spectral_bucket_t] * weight + spectra_d65[spectral_bucket_b] * (1.0f - weight);
+        float spectral_radiance = light.spectra[spectral_bucket_t] * weight + light.spectra[spectral_bucket_b] * (1.0f - weight);
     
         if (visible) {
             result.pdf = 1.0 / lights.num_lights / area;

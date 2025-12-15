@@ -9,7 +9,7 @@ struct Light {
     vec3 position;
     vec3 data[3]; // area light: data = vertices, directional light: data[0] = direction and data[1].r = radius
     float emit_type;
-    // float spectra[681];
+    float spectra[681];
 };
 
 struct Offsets {
