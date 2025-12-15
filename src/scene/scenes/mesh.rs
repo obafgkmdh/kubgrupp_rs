@@ -1,13 +1,5 @@
 use std::{
-    alloc::{self, Layout},
-    collections::HashMap,
-    f32::consts::PI,
-    ffi::{CStr, CString},
-    fs::File,
-    io::{BufRead, BufReader, Read},
-    iter::{self, Peekable},
-    path::Path,
-    ptr::NonNull,
+    alloc::{self, Layout}, collections::HashMap, f32::consts::PI, ffi::{CStr, CString}, fs::File, hash::Hash, io::{BufRead, BufReader, Read}, iter::{self, Peekable}, path::Path, ptr::NonNull
 };
 
 use anyhow::{anyhow, bail, Result};
@@ -48,6 +40,8 @@ pub struct MeshScene {
 
     pub brdf_buf: Vec<u8>,
     pub offset_buf: Vec<u32>,
+
+    pub spectra_data: Vec<[f32; 681]>,
 }
 
 #[derive(Debug, Clone)]
@@ -60,7 +54,7 @@ pub enum Light {
         color: Vec3,
         vertices: [Vec3; 3],
         emit_type: f32,
-        spectra: [f32; 681],
+        spectra_i: u32,
     },
     Directional {
         color: Vec3,
@@ -186,7 +180,8 @@ impl MeshScene {
         // this is to give them the correct brdf_params_index
         let mut objects =
             Self::parse_toml_objects(&conf, &mesh_map, &meshes, &shaders.rchit, &shader_type_map)?;
-        let lights = Self::parse_toml_lights(&conf, &mesh_map, &meshes, &mut objects)?;
+        let mut spectra_data = Vec::new();
+        let lights = Self::parse_toml_lights(&conf, &mesh_map, &meshes, &mut objects, &mut spectra_data)?;
 
         let (procedural_geometries, procedural_objects) =
             Self::parse_procedural_geometries(&conf, &lights)?;
@@ -206,6 +201,7 @@ impl MeshScene {
             procedural_objects,
             brdf_buf,
             offset_buf,
+            spectra_data,
         })
     }
 
@@ -601,6 +597,7 @@ impl MeshScene {
         mesh_map: &HashMap<String, u32>,
         meshes: &[Model],
         objects: &mut Vec<Object>,
+        spectra_data: &mut Vec<[f32; 681]>,
     ) -> Result<Vec<Light>> {
         let Value::Array(light_confs) = conf
             .get("light")
@@ -610,6 +607,8 @@ impl MeshScene {
         };
 
         let mut lights = Vec::new();
+
+        let mut spectra_map: HashMap<String, u32> = HashMap::new();
 
         for light_conf in light_confs {
             let Value::Table(light_conf) = light_conf else {
@@ -658,19 +657,29 @@ impl MeshScene {
                     let emit_type = Self::parse_toml_f32(value)?;
 
                     let spectra_filename = match light_conf.get("spectra") {
-                        Some(Value::String(spectra_filename)) => spectra_filename,
+                        Some(Value::String(spectra_filename)) => &spectra_filename,
                         _ => "d65",
                     };
-                    let spectra_path = Path::new(SPECTRA_DIR).join(spectra_filename);
-                    let spectra_file = File::open(spectra_path)?;
-                    let reader = BufReader::new(spectra_file);
 
-                    let spectra = reader
-                        .lines()
-                        .filter_map(|line| line.ok().and_then(|s| s.trim().parse::<f32>().ok()))
-                        .collect::<Vec<f32>>()
-                        .try_into()
-                        .unwrap();
+                    let spectra_i = if let Some(&idx) = spectra_map.get(spectra_filename) {
+                        idx
+                    } else {
+                        let spectra_path = Path::new(SPECTRA_DIR).join(spectra_filename);
+                        let spectra_file = File::open(spectra_path)?;
+                        let reader = BufReader::new(spectra_file);
+    
+                        let spectra = reader
+                            .lines()
+                            .filter_map(|line| line.ok().and_then(|s| s.trim().parse::<f32>().ok()))
+                            .collect::<Vec<f32>>()
+                            .try_into()
+                            .unwrap();
+
+                        let idx = spectra_data.len() as u32;
+                        spectra_data.push(spectra);
+                        spectra_map.insert(spectra_filename.to_string(), idx);
+                        idx
+                    };
 
                     let start_idx = lights.len();
 
@@ -699,7 +708,7 @@ impl MeshScene {
                             color,
                             vertices: vertices.try_into().unwrap(),
                             emit_type,
-                            spectra,
+                            spectra_i,
                         })
                     }
 

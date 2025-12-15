@@ -52,6 +52,8 @@ pub struct RaytraceRenderer {
     light_buffer: Option<AllocatedBuffer>,
     offset_buffer: Option<AllocatedBuffer>,
     brdf_param_buffer: Option<AllocatedBuffer>,
+    spectra_texture: Option<AllocatedImage>,
+    spectra_sampler: vk::Sampler,
     command_buffers: Vec<vk::CommandBuffer>,
     push_data: [u8; 128 + 8 + 4],
     current_frame: u32,
@@ -508,6 +510,14 @@ impl RaytraceRenderer {
                 binding: 6,
                 ..Default::default()
             },
+            // spectra texture
+            vk::DescriptorSetLayoutBinding {
+                descriptor_count: 1,
+                descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                stage_flags: vk::ShaderStageFlags::CLOSEST_HIT_KHR,
+                binding: 7,
+                ..Default::default()
+            },
         ];
 
         let create_info = vk::DescriptorSetLayoutCreateInfo {
@@ -770,6 +780,149 @@ impl RaytraceRenderer {
         staging_buffer.destroy(&self.device, &mut self.allocator.borrow_mut());
 
         Ok(buffer)
+    }
+
+    fn create_spectra_texture(
+        &self,
+        width: u32,
+        height: u32,
+        data: &[f32],
+    ) -> anyhow::Result<AllocatedImage> {
+        let format = vk::Format::R32_SFLOAT;
+        let mut image = AllocatedImage::new(
+            &self.device,
+            &mut self.allocator.borrow_mut(),
+            (width, height),
+            format,
+            vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
+            MemoryLocation::GpuOnly,
+        )?;
+
+        let data_bytes: &[u8] = bytemuck::cast_slice(data);
+        let mut buffer = AllocatedBuffer::new(
+            &self.device,
+            &mut self.allocator.borrow_mut(),
+            data_bytes.len() as u64,
+            vk::BufferUsageFlags::TRANSFER_SRC,
+            MemoryLocation::CpuToGpu,
+            self.device_properties.limits,
+        )?;
+
+        buffer.store(data)?;
+
+        let cmd_buffer = {
+            let allocate_info = vk::CommandBufferAllocateInfo {
+                command_buffer_count: 1,
+                command_pool: self.command_pool,
+                level: vk::CommandBufferLevel::PRIMARY,
+                ..Default::default()
+            };
+            unsafe {
+                self.device.allocate_command_buffers(&allocate_info)?[0]
+            }
+        };
+
+        unsafe {
+            self.device.begin_command_buffer(cmd_buffer, &vk::CommandBufferBeginInfo {
+                flags: vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT,
+                ..Default::default()
+            })?;
+
+            self.device.cmd_pipeline_barrier(
+                cmd_buffer,
+                vk::PipelineStageFlags::TOP_OF_PIPE,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[vk::ImageMemoryBarrier {
+                    src_access_mask: vk::AccessFlags::NONE,
+                    dst_access_mask: vk::AccessFlags::TRANSFER_WRITE,
+                    old_layout: vk::ImageLayout::UNDEFINED,
+                    new_layout: vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                    image: image.image,
+                    subresource_range: vk::ImageSubresourceRange {
+                        aspect_mask: vk::ImageAspectFlags::COLOR,
+                        base_mip_level: 0,
+                        level_count: 1,
+                        base_array_layer: 0,
+                        layer_count: 1,
+                    },
+                    ..Default::default()
+                }]
+            );
+
+            self.device.cmd_copy_buffer_to_image(
+                cmd_buffer,
+                buffer.buffer,
+                image.image,
+                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                &[vk::BufferImageCopy {
+                    buffer_offset: 0,
+                    buffer_row_length: 0,
+                    buffer_image_height: 0,
+                    image_subresource: vk::ImageSubresourceLayers {
+                        aspect_mask: vk::ImageAspectFlags::COLOR,
+                        mip_level: 0,
+                        base_array_layer: 0,
+                        layer_count: 1,
+                    },
+                    image_offset: vk::Offset3D {
+                        x: 0,
+                        y: 0,
+                        z: 0,
+                    },
+                    image_extent: vk::Extent3D {
+                        width,
+                        height,
+                        depth: 1,
+                    },
+                }]
+            );
+
+            self.device.cmd_pipeline_barrier(
+                cmd_buffer,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::PipelineStageFlags::RAY_TRACING_SHADER_KHR,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[vk::ImageMemoryBarrier {
+                    src_access_mask: vk::AccessFlags::TRANSFER_WRITE,
+                    dst_access_mask: vk::AccessFlags::SHADER_READ,
+                    old_layout: vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                    new_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    image: image.image,
+                    subresource_range: vk::ImageSubresourceRange {
+                        aspect_mask: vk::ImageAspectFlags::COLOR,
+                        base_mip_level: 0,
+                        level_count: 1,
+                        base_array_layer: 0,
+                        layer_count: 1,
+                    },
+                    ..Default::default()
+                }]
+            );
+
+            self.device.end_command_buffer(cmd_buffer)?;
+            self.device.queue_submit(
+                self.compute_queue,
+                &[vk::SubmitInfo {
+                    command_buffer_count: 1,
+                    p_command_buffers: &raw const cmd_buffer,
+                    ..Default::default()
+                }],
+                vk::Fence::null()
+            )?;
+
+            self.device.queue_wait_idle(self.compute_queue)?;
+            self.device.free_command_buffers(self.command_pool, &[cmd_buffer]);
+            buffer.destroy(&self.device, &mut self.allocator.borrow_mut());
+        }
+
+        image.layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+
+        Ok(image)
     }
 
     fn create_sbt(
@@ -1077,6 +1230,17 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
         };
         let compute_queue = unsafe { device.get_device_queue(compute_queue_index, 0) };
 
+        let sampler_info = vk::SamplerCreateInfo {
+            mag_filter: vk::Filter::LINEAR,
+            min_filter: vk::Filter::LINEAR,
+            address_mode_u: vk::SamplerAddressMode::CLAMP_TO_EDGE,
+            address_mode_v: vk::SamplerAddressMode::CLAMP_TO_EDGE,
+            address_mode_w: vk::SamplerAddressMode::CLAMP_TO_EDGE,
+            ..Default::default()
+        };
+
+        let spectra_sampler = unsafe { device.create_sampler(&sampler_info, None) }?;
+
         Ok(RaytraceRenderer {
             allocator,
             device: device.clone(),
@@ -1110,6 +1274,8 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             light_buffer: Default::default(),
             offset_buffer: Default::default(),
             brdf_param_buffer: Default::default(),
+            spectra_texture: Default::default(),
+            spectra_sampler,
             command_buffers: Default::default(),
             push_data: [0; 128 + 8 + 4],
             current_frame: 0,
@@ -1251,12 +1417,12 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
                 light_data.extend_from_slice(bytemuck::cast_slice(&color.to_array()));
                 light_data.extend_from_slice(bytemuck::cast_slice(&position.to_array()));
                 light_data.extend_from_slice(bytemuck::cast_slice(&[0f32; 10]));
-                light_data.extend_from_slice(bytemuck::cast_slice(&[0f32; 681]));
+                light_data.extend_from_slice(bytemuck::cast_slice(&[0u32]));
             } else if let Light::Triangle {
                 color,
                 vertices,
                 emit_type,
-                spectra,
+                spectra_i,
             } = light
             {
                 light_data.extend_from_slice(bytemuck::cast_slice(&[1u32]));
@@ -1266,7 +1432,7 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
                     light_data.extend_from_slice(bytemuck::cast_slice(&vertex.to_array()));
                 }
                 light_data.extend_from_slice(&emit_type.to_ne_bytes());
-                light_data.extend_from_slice(bytemuck::cast_slice(spectra));
+                light_data.extend_from_slice(bytemuck::cast_slice(&[*spectra_i]));
             } else if let Light::Directional {
                 color,
                 position,
@@ -1281,13 +1447,20 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
                 light_data.extend_from_slice(bytemuck::cast_slice(&direction.to_array()));
                 light_data.extend_from_slice(&radius.to_ne_bytes());
                 light_data.extend_from_slice(bytemuck::cast_slice(&[0f32; 6]));
-                light_data.extend_from_slice(bytemuck::cast_slice(&[0f32; 681]));
+                light_data.extend_from_slice(bytemuck::cast_slice(&[0u32]));
             }
         }
 
         self.light_buffer = Some(unsafe {
             self.create_device_buffer(&light_data, vk::BufferUsageFlags::STORAGE_BUFFER)?
         });
+
+        if scene.spectra_data.is_empty() {
+            self.spectra_texture = Some(self.create_spectra_texture(1, 1, &[1f32])?);
+        } else {
+            let flattened_spectra_data: Vec<f32> = scene.spectra_data.iter().flatten().copied().collect();
+            self.spectra_texture = Some(self.create_spectra_texture(681, scene.spectra_data.len() as u32, &flattened_spectra_data)?);
+        }
 
         self.offset_buffer = Some(unsafe {
             self.create_device_buffer(&scene.offset_buf, vk::BufferUsageFlags::STORAGE_BUFFER)?
@@ -1382,6 +1555,21 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
                 ..Default::default()
             });
         }
+
+        let spectra_info = vk::DescriptorImageInfo {
+            image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+            image_view: self.spectra_texture.as_ref().unwrap().image_view,
+            sampler: self.spectra_sampler,
+        };
+        writes.push(vk::WriteDescriptorSet {
+            dst_set: self.descriptor_set,
+            dst_binding: 7,
+            dst_array_element: 0,
+            descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+            descriptor_count: 1,
+            p_image_info: &raw const spectra_info,
+            ..Default::default()
+        });
 
         unsafe {
             self.device.update_descriptor_sets(&writes, &[]);
@@ -1796,6 +1984,12 @@ impl Drop for RaytraceRenderer {
             if let Some(x) = self.brdf_param_buffer.take() {
                 x.destroy(&self.device, &mut self.allocator.borrow_mut());
             }
+
+            if let Some(x) = self.spectra_texture.take() {
+                x.destroy(&self.device, &mut self.allocator.borrow_mut());
+            }
+
+            self.device.destroy_sampler(self.spectra_sampler, None);
         }
     }
 }

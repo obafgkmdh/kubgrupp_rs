@@ -45,11 +45,9 @@ void main() {
         ray_info.rad = vec3(0);
         ray_info.hit_normal = -normal;
     } else {
-        float spectral_bucket = (ray_info.wavelength - minWavelength) * 2.0;
-        int spectral_bucket_t = int(ceil(spectral_bucket)+.5f);
-        int spectral_bucket_b = int(floor(spectral_bucket)+.5f);
-        float weight = spectral_bucket - spectral_bucket_b;
-        float spectral_radiance = light.spectra[spectral_bucket_t] * weight + light.spectra[spectral_bucket_b] * (1.0f - weight);
+        float wavelength_u = (ray_info.wavelength - minWavelength) / rangeWavelengths;
+        float wavelength_v = (float(light.spectra_i) + 0.5) / float(textureSize(SpectraTexture, 0).y);
+        float spectral_radiance = texture(SpectraTexture, vec2(wavelength_u, wavelength_v)).r;
 
         ray_info.is_emitter = true;
         ray_info.rad = vec3(spectral_radiance * light.color[0]);

@@ -52,12 +52,10 @@ EmitterSample sample_light(vec3 hit_pos, inout uint seed, inout float wavelength
             visible = true;
         }
 
-        float spectral_bucket = (wavelength - minWavelength) * 2.0;
-        int spectral_bucket_t = int(ceil(spectral_bucket)+.5f);
-        int spectral_bucket_b = int(floor(spectral_bucket)+.5f);
-        float weight = spectral_bucket - spectral_bucket_b;
-        float spectral_radiance = light.spectra[spectral_bucket_t] * weight + light.spectra[spectral_bucket_b] * (1.0f - weight);
-    
+        float wavelength_u = (wavelength - minWavelength) / rangeWavelengths;
+        float wavelength_v = (float(light.spectra_i) + 0.5) / float(textureSize(SpectraTexture, 0).y);
+        float spectral_radiance = texture(SpectraTexture, vec2(wavelength_u, wavelength_v)).r;
+
         if (visible) {
             result.pdf = 1.0 / lights.num_lights / area;
             result.normal = normal;

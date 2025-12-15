@@ -155,7 +155,7 @@ pub struct AllocatedImage {
     pub format: vk::Format,
     pub usage: vk::ImageUsageFlags,
     allocation: Allocation,
-    layout: vk::ImageLayout,
+    pub layout: vk::ImageLayout,
 }
 
 impl AllocatedImage {

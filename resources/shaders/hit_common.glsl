@@ -9,7 +9,7 @@ struct Light {
     vec3 position;
     vec3 data[3]; // area light: data = vertices, directional light: data[0] = direction and data[1].r = radius
     float emit_type;
-    float spectra[681];
+    uint spectra_i;
 };
 
 struct Offsets {
@@ -36,3 +36,5 @@ layout(scalar, set = 0, binding = 5) readonly buffer InstanceOffsets {
 } offsets;
 
 #define BRDF_PARAMS_BINDING 6
+
+layout(set = 0, binding = 7) uniform sampler2D SpectraTexture;
