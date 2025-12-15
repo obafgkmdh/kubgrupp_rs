@@ -14,7 +14,7 @@ fov = 70
 # area light
 [[light]]
 type = "area"
-color = [0.01, 1, 1]
+color = [1, 1, 1]
 mesh = "square.obj"
 transform = '''
 rotate 180 0 1 0
