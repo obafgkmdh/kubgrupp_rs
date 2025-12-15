@@ -14,7 +14,7 @@ fov = 70
 # area light
 [[light]]
 type = "area"
-color = [1, 1, 1]
+color = [0.05, 0.05, 0.05]
 mesh = "square.obj"
 transform = '''
 rotate 180 0 1 0
@@ -27,26 +27,11 @@ translate 0 0 2
 emit_type = 1
 spectra = "d65"
 
-#[[light]]
-#type = "area"
-#color = [200, 200, 200]
-#mesh = "circle.obj"
-#transform = '''
-#rotate -90 1 0 0
-#rotate -1 0 1 0
-#scale 0.04 0.04 1
-#translate 0.26 0.03 3
-#translate 0 0 -2
-#rotate -90 0 1 0
-#translate 0 0 2
-#'''
-#emit_type = 0
-
 [[light]]
 type = "directional"
-color = [80, 80, 80]
-position = [-1.5, 0.045, 2.11]
-direction = [2, 0, 0.7]
+color = [400, 400, 400]
+position = [-4, 0.045, 0.00]
+direction = [2, 0, 1.35]
 radius = 0.05
 
 [[brdf]]
@@ -76,7 +61,7 @@ translate 0 0 -2
 rotate -90 0 1 0
 translate 0 0 2
 '''
-brdf = {name = "dielectric", fields = [[1.5851495, 0.143559385, 1.08521269], [0.00926681282, 0.0424489805, 105.613573]]}
+brdf = {name = "dielectric", fields = [[1.73759695, 0.313747346, 1.89878101], [0.013188707, 0.0623068142, 155.23629]]}
 
 # floor
 [[object]]
@@ -88,29 +73,7 @@ translate 0 0 -2
 rotate -90 0 1 0
 translate 0 0 2
 '''
-brdf = {name = "diffuse", fields = [[0.9, 0.9, 0.9]]}
-
-## new floor
-#[[object]]
-#mesh = "square.obj"
-#transform = '''
-#translate -.5 -.5 1
-#scale 5 3 1
-#'''
-#brdf = {name = "diffuse", fields = [[1, 1, 1]]}
-
-## new other floor
-#[[object]]
-#mesh = "square.obj"
-#transform = '''
-#translate -.5 -.5 1
-#scale 5 3 1
-#translate 0 0 -2
-#rotate 90 0 1 0
-#translate -1 0 2
-#'''
-#brdf = {name = "diffuse", fields = [[1, 1, 1]]}
-
+brdf = {name = "diffuse", fields = [[1, 1, 1]]}
 
 # back wall
 [[object]]
@@ -120,4 +83,4 @@ rotate -90 1 0 0
 translate -0.5 0.0 1
 scale 5 10 5
 '''
-brdf = {name = "diffuse", fields = [[0.9, 0.9, 0.9]]}
+brdf = {name = "diffuse", fields = [[1, 1, 1]]}
