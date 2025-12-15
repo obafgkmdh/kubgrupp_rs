@@ -2,6 +2,8 @@
 raygen = "path.rgen"
 miss = "black.rmiss"
 emitter_hit = "emitter.rchit"
+directional_emitter_int = "disc.rint"
+directional_emitter_hit = "directional_emitter.rchit"
 
 [camera]
 view = '''
@@ -9,13 +11,14 @@ lookat 0 2 2.2   0 0 2.2    0 0 1
 '''
 fov = 70
 
+# area light
 [[light]]
 type = "area"
 color = [1, 1, 1]
 mesh = "square.obj"
 transform = '''
 rotate 180 0 1 0
-scale 0.16 0.16 1
+scale 0.18 0.18 1
 translate -0.8 0 3.8
 translate 0 0 -2
 rotate -90 0 1 0
@@ -23,28 +26,27 @@ translate 0 0 2
 '''
 emit_type = 1
 
-[[light]]
-type = "area"
-color = [200, 200, 200]
-mesh = "circle.obj"
-transform = '''
-rotate -90 1 0 0
-rotate -1 0 1 0
-scale 0.04 0.04 1
-translate 0.26 0.03 3
-translate 0 0 -2
-rotate -90 0 1 0
-translate 0 0 2
-'''
-emit_type = 0
-
 #[[light]]
-#type = "directional"
-#color = [10, 10, 10]
-#position = [0.2, 0.03, 3]
-#direction = [0, 0.001, -1]
-#radius = 0.1
+#type = "area"
+#color = [200, 200, 200]
+#mesh = "circle.obj"
+#transform = '''
+#rotate -90 1 0 0
+#rotate -1 0 1 0
+#scale 0.04 0.04 1
+#translate 0.26 0.03 3
+#translate 0 0 -2
+#rotate -90 0 1 0
+#translate 0 0 2
+#'''
+#emit_type = 0
 
+[[light]]
+type = "directional"
+color = [80, 80, 80]
+position = [-1, 0.045, 2.26]
+direction = [2, 0, 0.6]
+radius = 0.05
 
 [[brdf]]
 name = "diffuse"
@@ -80,12 +82,12 @@ brdf = {name = "dielectric", fields = [[1.03961212, 0.231792344, 1.01046945], [0
 mesh = "square.obj"
 transform = '''
 translate -.5 -.5 1
-scale 5 3 1
+scale 5 1.5 1
 translate 0 0 -2
 rotate -90 0 1 0
 translate 0 0 2
 '''
-brdf = {name = "diffuse", fields = [[1, 1, 1]]}
+brdf = {name = "diffuse", fields = [[0.9, 0.9, 0.9]]}
 
 ## new floor
 #[[object]]
@@ -117,4 +119,4 @@ rotate -90 1 0 0
 translate -0.5 0.0 1
 scale 5 10 5
 '''
-brdf = {name = "diffuse", fields = [[1, 1, 1]]}
+brdf = {name = "diffuse", fields = [[0.9, 0.9, 0.9]]}

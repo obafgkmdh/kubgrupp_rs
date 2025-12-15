@@ -6,6 +6,7 @@
 
 #include "ray_common.glsl"
 #include "hit_common.glsl"
+#include "color_spaces.glsl"
 
 layout(location = 0) rayPayloadInEXT RayPayload ray_info;
 
@@ -28,17 +29,23 @@ void main() {
     float radius = (scale.x + scale.y) * 0.5;
     float area = PI * radius * radius;
 
+    vec3 to_center = light.position - gl_WorldRayOriginEXT;
+    vec3 along_beam = dot(to_center, world_normal) * world_normal;
+    float dist = length(to_center - along_beam);
+
     ray_info.is_hit = true;
     ray_info.hit_pos = hit_pos;
     ray_info.emitter_pdf = 1.0 / float(lights.num_lights) / area;
 
-    if (is_front_face) {
+    if (is_front_face && dist < radius) {
         ray_info.is_emitter = true;
-        ray_info.rad = light.color;
+        ray_info.rad = vec3(rgb_to_spectrum(light.color, ray_info.wavelength));
         ray_info.hit_normal = world_normal;
+        ray_info.emitter_type = 2.0;
     } else {
         ray_info.is_emitter = true;
         ray_info.rad = vec3(0);
         ray_info.hit_normal = -world_normal;
+        ray_info.emitter_type = -1.0;
     }
 }

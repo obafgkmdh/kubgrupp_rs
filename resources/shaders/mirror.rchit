@@ -13,7 +13,7 @@ layout(location = 0) rayPayloadInEXT RayPayload ray_info;
 hitAttributeEXT vec2 bary_coord;
 
 void sample_brdf(vec3 hit_normal) {
-    ray_info.brdf_vals = vec3(1);
+    ray_info.brdf_val = 1;
     ray_info.brdf_pdf = 1.0;
 
     ray_info.brdf_d = reflect(gl_WorldRayDirectionEXT, hit_normal);

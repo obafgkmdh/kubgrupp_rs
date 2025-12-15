@@ -10,14 +10,14 @@
 #include "random.glsl"
 #include "color_spaces.glsl"
 
-#define MIS
+// #define MIS
 #define SAMPLE_EMITTER
 // #define DEBUG_CENTER_DOT
 
 layout(location = 0) rayPayloadEXT RayPayload ray_info;
 
-const uint MAX_DEPTH = 8;
-const uint SPP = 8;
+const uint MAX_DEPTH = 20;
+const uint SPP = 16;
 
 float power_heuristic(float a, float b) {
     float t = a * a;
@@ -106,6 +106,9 @@ void main() {
                     value += throughput * mis_weight * ray_info.rad.x;
                 }
                 if (ray_info.emitter_type == 0.0 && abs(dot(-ray_d, ray_info.hit_normal)) >= 0.996) {
+                    value += throughput * mis_weight * ray_info.rad.x;
+                }
+                if (ray_info.emitter_type == 2.0) {
                     value += throughput * mis_weight * ray_info.rad.x;
                 }
                 break;
