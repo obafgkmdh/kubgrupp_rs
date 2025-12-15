@@ -14,7 +14,7 @@ fov = 70
 # area light
 [[light]]
 type = "area"
-color = [1, 1, 1]
+color = [0.01, 1, 1]
 mesh = "square.obj"
 transform = '''
 rotate 180 0 1 0
@@ -25,6 +25,7 @@ rotate -90 0 1 0
 translate 0 0 2
 '''
 emit_type = 1
+spectra = "d65"
 
 #[[light]]
 #type = "area"
@@ -44,8 +45,8 @@ emit_type = 1
 [[light]]
 type = "directional"
 color = [80, 80, 80]
-position = [-1, 0.045, 2.26]
-direction = [2, 0, 0.6]
+position = [-1.5, 0.045, 2.11]
+direction = [2, 0, 0.7]
 radius = 0.05
 
 [[brdf]]
@@ -75,7 +76,7 @@ translate 0 0 -2
 rotate -90 0 1 0
 translate 0 0 2
 '''
-brdf = {name = "dielectric", fields = [[1.03961212, 0.231792344, 1.01046945], [0.00600069867, 0.0200179144, 10.3560653]]}
+brdf = {name = "dielectric", fields = [[1.5851495, 0.143559385, 1.08521269], [0.00926681282, 0.0424489805, 105.613573]]}
 
 # floor
 [[object]]
