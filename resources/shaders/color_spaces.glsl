@@ -40,12 +40,21 @@ vec3 XYZtoRGB_Rec709(vec3 c) {
     return transpose(M) * c;
 }
 
-// spectrumToRgb from PLTFalcor
+vec3 XYZtoSRGB_linear(vec3 c) {
+    const mat3 M = mat3(
+        3.240969941904523, -1.537383177570094, -0.498610760293003,
+        -0.969243636280880, 1.875967501507721, 0.041555057407176,
+        0.055630079696994, -0.203976958888977, 1.056971514242879
+    );
+    return transpose(M) * c;
+}
+
+// spectrumToRgb adapted from PLTFalcor
 vec3 spectrumToRgb(float wavelength) {
     vec3 xyz = wavelengthToXYZ(wavelength) * wavelengthToD65(wavelength);
 
     const float Y_D65 = 10.5670762f;
-    return XYZtoRGB_Rec709(xyz) / Y_D65;
+    return XYZtoSRGB_linear(xyz) / Y_D65;
 }
 
 const float white_sd[11] = float[11](1,1,0.9999,0.9993,0.9992,0.9998,1,1,1,1,0);

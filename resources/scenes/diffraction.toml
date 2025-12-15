@@ -5,31 +5,31 @@ emitter_hit = "emitter.rchit"
 
 [camera]
 view = '''
-lookat 0 4 2   0 0 0    0 0 1
+lookat 1.5 5 2.8   -2 -0.5 1    0 0 1
 '''
 fov = 70
 
 [[light]]
 type = "area"
-color = [0.7, 0.7, 1]
+color = [0.9, 0.9, 0.9]
 mesh = "square.obj"
 transform = '''
 rotate 180 0 1 0
 scale 1 1 1
-rotate 12 1 0 0
-translate 0 0.1 4.8
+translate 0.1 1 4.8
 '''
 emit_type = 1
 
 [[light]]
 type = "area"
-color = [5, 5, 5]
+color = [80, 80, 80]
 mesh = "circle.obj"
 transform = '''
-scale 0.08 1 0.08
-rotate 180 1 0 0
-rotate 95 1 0 0
-translate 0.3 0.5 3.8
+scale 0.2 0.2 0.2
+rotate -90 1 0 0
+rotate -20 1 0 0
+rotate 60 0 1 0
+translate -1.4 0.8 0.6
 '''
 emit_type = 0
 
@@ -54,29 +54,45 @@ type = "float"
 name = "towards"
 type = "vec3"
 
-[[object]]
-mesh = "circle.obj"
+[[procedural_geometry]]
+name = "dvd"
+aabbs = [[-1, -1, -1, 1, 1, 1]]
+intersection_shader = "dvd.rint"
+closest_hit_shader = "dvd.rchit"
+
+[[procedural_object]]
+geometry = "dvd"
 transform = '''
-rotate 90 1 0 0
-translate 0 0.16 0.001
+translate 0 -1 0
+rotate -45 1 0 0
+translate 0 1 0.01
 '''
-brdf = {name = "diffraction_grating", fields = [740, 110, [0, 1, 0]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+rotate 45 0 0 1
+scale 2 2 1
+translate -2.7 0.16 0.001
+'''
+brdf = {name = "diffraction_grating", fields = [740, 110, [-1, 1, 0]]}
 
 [[object]]
 mesh = "cube.obj"
 transform = '''
-translate 0.8 0.1 0
+translate 1.2 0.1 0
 '''
-brdf = {name = "diffuse", fields = [[0.8, 1, 0.8]]}
+brdf = {name = "diffuse", fields = [[0.4, 1, 0.4]]}
 
 # floor
 [[object]]
 mesh = "square.obj"
 transform = '''
 translate -.5 -.5 0
-scale 10 10 1
+scale 8 10 1
 '''
-brdf = {name = "diffuse", fields = [[1, 1, 1]]}
+brdf = {name = "diffuse", fields = [[0.9, 0.9, 0.9]]}
 
 # back wall
 [[object]]
@@ -86,7 +102,7 @@ rotate -90 1 0 0
 translate -0.5 -0.25 1
 scale 10 10 5
 '''
-brdf = {name = "diffuse", fields = [[1, 1, 1]]}
+brdf = {name = "diffuse", fields = [[0.9, 0.9, 0.9]]}
 
 # left wall
 [[object]]
@@ -95,9 +111,9 @@ transform = '''
 translate -.5 -.5 0
 scale 10 10 1
 rotate 90 0 1 0
-translate -5 0 0
+translate -4 0 0
 '''
-brdf = {name = "diffuse", fields = [[1, 1, 1]]}
+brdf = {name = "diffuse", fields = [[1, 0.5, 0.5]]}
 
 # right wall
 [[object]]
@@ -106,16 +122,16 @@ transform = '''
 translate -.5 -.5 0
 scale 10 10 1
 rotate -90 0 1 0
-translate 5 0 0
+translate 4 0 0
 '''
-brdf = {name = "diffuse", fields = [[1, 1, 1]]}
+brdf = {name = "diffuse", fields = [[0.5, 0.5, 1]]}
 
 # ceiling
 [[object]]
 mesh = "square.obj"
 transform = '''
 translate -.5 -.5 0
-scale 10 10 1
+scale 8 10 1
 translate 0 0 5
 '''
-brdf = {name = "diffuse", fields = [[1, 1, 1]]}
+brdf = {name = "diffuse", fields = [[0.9, 0.9, 0.9]]}
