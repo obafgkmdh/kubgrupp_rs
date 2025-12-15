@@ -657,22 +657,22 @@ impl MeshScene {
                     };
                     let emit_type = Self::parse_toml_f32(value)?;
 
-                    let spectra = if let Some(Value::String(spectra_filename)) =
-                        light_conf.get("spectra")
-                    {
-                        let spectra_path = Path::new(SPECTRA_DIR).join(spectra_filename);
-                        let spectra_file = File::open(spectra_path)?;
-                        let reader = BufReader::new(spectra_file);
-
-                        let spectra: Vec<f32> = reader
-                            .lines()
-                            .filter_map(|line| line.ok().and_then(|s| s.trim().parse::<f32>().ok()))
-                            .collect();
-
-                        spectra.try_into().unwrap()
-                    } else {
-                        [1f32; 681]
+                    let spectra_filename = match light_conf.get("spectra") {
+                        Some(Value::String(spectra_filename)) => spectra_filename,
+                        _ => "d65",
                     };
+                    let spectra_path = Path::new(SPECTRA_DIR).join(spectra_filename);
+                    let spectra_file = File::open(spectra_path)?;
+                    let reader = BufReader::new(spectra_file);
+
+                    let spectra = reader
+                        .lines()
+                        .filter_map(|line| line.ok().and_then(|s| s.trim().parse::<f32>().ok()))
+                        .collect::<Vec<f32>>()
+                        .try_into()
+                        .unwrap();
+
+                    println!("{:?}", spectra);
 
                     let start_idx = lights.len();
 
