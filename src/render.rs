@@ -1,4 +1,4 @@
-use std::{cell::RefCell, ffi::c_char, rc::Rc};
+use std::{cell::RefCell, ffi::c_char, path::Path, rc::Rc};
 
 use crate::{features::VkFeatureGuard, scene::Scene, utils::QueueFamilyInfo};
 use ash::{vk, Device, Entry, Instance};
@@ -24,6 +24,8 @@ where
 
     fn ingest_scene(&mut self, scene: &S) -> anyhow::Result<()>;
     fn render_to(&mut self, updates: &[S::Update], target: &mut Target) -> anyhow::Result<()>;
+
+    fn save_image<P: AsRef<Path>>(&self, path: P) -> anyhow::Result<()>;
 
     fn required_instance_extensions() -> &'static [*const c_char];
     fn required_device_extensions() -> &'static [*const c_char];

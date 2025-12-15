@@ -1,8 +1,9 @@
-use std::{cell::RefCell, ffi::c_char, rc::Rc, sync::LazyLock};
+use std::{cell::RefCell, ffi::c_char, path::Path, rc::Rc, sync::LazyLock};
 
 use anyhow::anyhow;
 use ash::{khr, vk, Device, Entry, Instance};
 use gpu_allocator::{vulkan::*, MemoryLocation};
+use image::{ImageBuffer, Rgba};
 use tobj::Model;
 
 use crate::{
@@ -1487,6 +1488,181 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
         target.present(self.compute_queue)?;
 
         self.current_frame += 1;
+
+        Ok(())
+    }
+
+    fn save_image<P: AsRef<Path>>(&self, path: P) -> anyhow::Result<()> {
+        let storage_image = self
+            .storage_image
+            .as_ref()
+            .ok_or_else(|| anyhow!("no storage image"))?;
+
+        let width = storage_image.width;
+        let height = storage_image.height;
+        let pixel_size = 4 * std::mem::size_of::<f32>(); // RGBA f32
+        let buffer_size = (width * height) as usize * pixel_size;
+
+        unsafe {
+            self.device.device_wait_idle()?;
+        }
+
+        let staging_buffer = AllocatedBuffer::new(
+            &self.device,
+            &mut self.allocator.borrow_mut(),
+            buffer_size as vk::DeviceSize,
+            vk::BufferUsageFlags::TRANSFER_DST,
+            MemoryLocation::GpuToCpu,
+            self.device_properties.limits,
+        )?;
+
+        let command_buffer = {
+            let allocate_info = vk::CommandBufferAllocateInfo {
+                command_buffer_count: 1,
+                command_pool: self.command_pool,
+                level: vk::CommandBufferLevel::PRIMARY,
+                ..Default::default()
+            };
+            unsafe { self.device.allocate_command_buffers(&allocate_info)?[0] }
+        };
+
+        unsafe {
+            self.device.begin_command_buffer(
+                command_buffer,
+                &vk::CommandBufferBeginInfo {
+                    flags: vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT,
+                    ..Default::default()
+                },
+            )?;
+
+            self.device.cmd_pipeline_barrier(
+                command_buffer,
+                vk::PipelineStageFlags::RAY_TRACING_SHADER_KHR,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[vk::ImageMemoryBarrier {
+                    src_access_mask: vk::AccessFlags::SHADER_WRITE,
+                    dst_access_mask: vk::AccessFlags::TRANSFER_READ,
+                    old_layout: vk::ImageLayout::GENERAL,
+                    new_layout: vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                    image: storage_image.image,
+                    subresource_range: vk::ImageSubresourceRange {
+                        aspect_mask: vk::ImageAspectFlags::COLOR,
+                        base_mip_level: 0,
+                        level_count: 1,
+                        base_array_layer: 0,
+                        layer_count: 1,
+                    },
+                    ..Default::default()
+                }],
+            );
+
+            self.device.cmd_copy_image_to_buffer(
+                command_buffer,
+                storage_image.image,
+                vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                staging_buffer.buffer,
+                &[vk::BufferImageCopy {
+                    buffer_offset: 0,
+                    buffer_row_length: 0,
+                    buffer_image_height: 0,
+                    image_subresource: vk::ImageSubresourceLayers {
+                        aspect_mask: vk::ImageAspectFlags::COLOR,
+                        mip_level: 0,
+                        base_array_layer: 0,
+                        layer_count: 1,
+                    },
+                    image_offset: vk::Offset3D { x: 0, y: 0, z: 0 },
+                    image_extent: vk::Extent3D {
+                        width,
+                        height,
+                        depth: 1,
+                    },
+                }],
+            );
+
+            self.device.cmd_pipeline_barrier(
+                command_buffer,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::PipelineStageFlags::RAY_TRACING_SHADER_KHR,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[vk::ImageMemoryBarrier {
+                    src_access_mask: vk::AccessFlags::TRANSFER_READ,
+                    dst_access_mask: vk::AccessFlags::SHADER_WRITE,
+                    old_layout: vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                    new_layout: vk::ImageLayout::GENERAL,
+                    image: storage_image.image,
+                    subresource_range: vk::ImageSubresourceRange {
+                        aspect_mask: vk::ImageAspectFlags::COLOR,
+                        base_mip_level: 0,
+                        level_count: 1,
+                        base_array_layer: 0,
+                        layer_count: 1,
+                    },
+                    ..Default::default()
+                }],
+            );
+
+            self.device.end_command_buffer(command_buffer)?;
+
+            self.device.queue_submit(
+                self.compute_queue,
+                &[vk::SubmitInfo {
+                    command_buffer_count: 1,
+                    p_command_buffers: &raw const command_buffer,
+                    ..Default::default()
+                }],
+                vk::Fence::null(),
+            )?;
+
+            self.device.queue_wait_idle(self.compute_queue)?;
+            self.device
+                .free_command_buffers(self.command_pool, &[command_buffer]);
+        }
+
+        let pixel_data: &[f32] = unsafe {
+            let ptr = staging_buffer
+                .mapped_ptr()
+                .ok_or_else(|| anyhow!("staging buffer not mapped"))? as *const f32;
+            std::slice::from_raw_parts(ptr, width as usize * height as usize * 4)
+        };
+
+        let mut img_data = Vec::with_capacity(width as usize * height as usize * 4);
+        for pixel in pixel_data.chunks(4) {
+            let r = pixel[0];
+            let g = pixel[1];
+            let b = pixel[2];
+            let a = pixel[3];
+
+            let to_srgb = |v: f32| -> u8 {
+                let c = v.clamp(0.0, 1.0);
+                let srgb = if c <= 0.0031308 {
+                    12.92 * c
+                } else {
+                    1.055 * c.powf(1.0 / 2.4) - 0.055
+                };
+                (srgb * 255.0) as u8
+            };
+
+            img_data.push(to_srgb(r));
+            img_data.push(to_srgb(g));
+            img_data.push(to_srgb(b));
+            img_data.push((a.clamp(0.0, 1.0) * 255.0) as u8);
+        }
+
+        let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
+            ImageBuffer::from_raw(width, height, img_data)
+                .ok_or_else(|| anyhow!("failed to create image buffer"))?;
+
+        img.save(path)?;
+
+        unsafe {
+            staging_buffer.destroy(&self.device, &mut self.allocator.borrow_mut());
+        }
 
         Ok(())
     }

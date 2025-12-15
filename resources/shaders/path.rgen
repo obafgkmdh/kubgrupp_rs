@@ -200,5 +200,8 @@ void main() {
 
     result = rad / (frame + 1.0);
 
+    // reinhard tonemap
+    result = result / (1.0 + result);
+
     imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(result, 1.0));
 }

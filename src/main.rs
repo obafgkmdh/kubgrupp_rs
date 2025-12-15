@@ -71,13 +71,22 @@ struct MeshApp<R> {
     scene: MeshScene,
     pending_resize: Option<(u32, u32)>,
     prev_instant: Option<Instant>,
+    frame_count: u32,
+    capture_frame: Option<u32>,
+    output_path: String,
 }
 
 impl<R> MeshApp<R>
 where
     R: Renderer<MeshScene, WindowData>,
 {
-    pub fn new(event_loop: &EventLoop<()>, scene: MeshScene, debug_mode: bool) -> Result<Self> {
+    pub fn new(
+        event_loop: &EventLoop<()>,
+        scene: MeshScene,
+        debug_mode: bool,
+        capture_frame: Option<u32>,
+        output_path: String,
+    ) -> Result<Self> {
         let vk_lib = unsafe { Entry::load().expect("failed to load Vulkan library") };
 
         let enable_vk_debug = debug_mode && Self::is_vk_debug_supported(&vk_lib)?;
@@ -136,6 +145,9 @@ where
             scene,
             pending_resize: None,
             prev_instant: None,
+            frame_count: 0,
+            capture_frame,
+            output_path,
         })
     }
 
@@ -516,6 +528,23 @@ where
                     .render_to(&updates, self.window.as_mut().unwrap())
                     .expect("failed to render to target");
 
+                self.frame_count += 1;
+                print!("\rFrame: {}    ", self.frame_count);
+                std::io::Write::flush(&mut std::io::stdout()).ok();
+
+                if let Some(target_frame) = self.capture_frame {
+                    if self.frame_count >= target_frame {
+                        println!("Capturing frame {} to {}", self.frame_count, self.output_path);
+                        self.renderer
+                            .as_mut()
+                            .unwrap()
+                            .save_image(&self.output_path)
+                            .expect("failed to save image");
+                        event_loop.exit();
+                        return;
+                    }
+                }
+
                 self.window.as_ref().unwrap().request_redraw();
             }
             _ => (),
@@ -542,6 +571,12 @@ where
 struct Args {
     #[arg(short, long)]
     scene_file: String,
+
+    #[arg(short = 'c', long)]
+    capture_frame: Option<u32>,
+
+    #[arg(short = 'o', long, default_value = "output.png")]
+    output: String,
 }
 
 fn main() {
@@ -557,6 +592,13 @@ fn main() {
     let path = Path::new("resources/scenes/").join(&args.scene_file);
     let file = File::open(path).expect("scene file does not exist");
     let scene = MeshScene::load_from(file).expect("scene could not be loaded");
-    let mut app: MeshApp<RaytraceRenderer> = MeshApp::new(&event_loop, scene, DEBUG_MODE).unwrap();
+    let mut app: MeshApp<RaytraceRenderer> = MeshApp::new(
+        &event_loop,
+        scene,
+        DEBUG_MODE,
+        args.capture_frame,
+        args.output,
+    )
+    .unwrap();
     event_loop.run_app(&mut app).unwrap();
 }
