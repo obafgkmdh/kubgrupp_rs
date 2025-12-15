@@ -16,8 +16,8 @@
 
 layout(location = 0) rayPayloadEXT RayPayload ray_info;
 
-const uint MAX_DEPTH = 15;
-const uint SPP = 16;
+const uint MAX_DEPTH = 6;
+const uint SPP = 1;
 
 float power_heuristic(float a, float b) {
     float t = a * a;

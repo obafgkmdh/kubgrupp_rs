@@ -4,7 +4,7 @@ use std::{
     f32::consts::PI,
     ffi::{CStr, CString},
     fs::File,
-    io::Read,
+    io::{BufRead, BufReader, Read},
     iter::{self, Peekable},
     path::Path,
     ptr::NonNull,
@@ -28,6 +28,7 @@ use crate::{
 
 const MESHES_DIR: &str = "resources/meshes";
 const SPIRV_DIR: &str = "resources/shaders/spv/";
+const SPECTRA_DIR: &str = "resources/spectra";
 const SPIRV_EXTENSION: &str = ".spv";
 const SPIRV_MAGIC: u32 = 0x07230203;
 
@@ -59,6 +60,7 @@ pub enum Light {
         color: Vec3,
         vertices: [Vec3; 3],
         emit_type: f32,
+        spectra: [f32; 681],
     },
     Directional {
         color: Vec3,
@@ -655,6 +657,23 @@ impl MeshScene {
                     };
                     let emit_type = Self::parse_toml_f32(value)?;
 
+                    let spectra = if let Some(Value::String(spectra_filename)) =
+                        light_conf.get("spectra")
+                    {
+                        let spectra_path = Path::new(SPECTRA_DIR).join(spectra_filename);
+                        let spectra_file = File::open(spectra_path)?;
+                        let reader = BufReader::new(spectra_file);
+
+                        let spectra: Vec<f32> = reader
+                            .lines()
+                            .filter_map(|line| line.ok().and_then(|s| s.trim().parse::<f32>().ok()))
+                            .collect();
+
+                        spectra.try_into().unwrap()
+                    } else {
+                        [1f32; 681]
+                    };
+
                     let start_idx = lights.len();
 
                     // load triangles to get triangle lights
@@ -682,6 +701,7 @@ impl MeshScene {
                             color,
                             vertices: vertices.try_into().unwrap(),
                             emit_type,
+                            spectra,
                         })
                     }
 

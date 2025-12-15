@@ -51,10 +51,17 @@ EmitterSample sample_light(vec3 hit_pos, inout uint seed, inout float wavelength
         } else if (light.emit_type == 1.0 && cos_angle_to_light >= 0.0) {
             visible = true;
         }
+
+        float spectral_bucket = (wavelength - minWavelength) * 2.0;
+        int spectral_bucket_t = int(ceil(spectral_bucket)+.5f);
+        int spectral_bucket_b = int(floor(spectral_bucket)+.5f);
+        float weight = spectral_bucket - spectral_bucket_b;
+        float spectral_radiance = light.spectra[spectral_bucket_t] * weight + light.spectra[spectral_bucket_b] * (1.0f - weight);
+    
         if (visible) {
             result.pdf = 1.0 / lights.num_lights / area;
             result.normal = normal;
-            result.radiance = vec3(rgb_to_spectrum(light.color, wavelength));
+            result.radiance = vec3(spectral_radiance * light.color[0]);
         }
     } else if (light.type == EMITTER_TYPE_DIRECTIONAL) {
         vec3 light_dir = normalize(light.data[0]);
