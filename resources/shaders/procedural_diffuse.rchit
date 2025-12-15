@@ -23,7 +23,7 @@ vec2 eval_brdf(vec3 wi, vec3 normal) {
 
 void sample_brdf(vec3 normal) {
     vec4 cos_sample = sample_cosine_hemisphere(rnd(ray_info.seed), rnd(ray_info.seed));
-    ray_info.brdf_vals = albedo;
+    ray_info.brdf_val = rgb_to_spectrum(albedo, ray_info.wavelength);
     ray_info.brdf_pdf = cos_sample.w;
     ray_info.brdf_d = frame_sample(cos_sample.xyz, normal);
 }

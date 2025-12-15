@@ -41,7 +41,7 @@ void main() {
         ray_info.is_emitter = true;
         ray_info.rad = vec3(rgb_to_spectrum(light.color, ray_info.wavelength));
         ray_info.hit_normal = world_normal;
-        ray_info.emitter_type = 2.0;
+        ray_info.emitter_type = 1.0;
     } else {
         ray_info.is_emitter = true;
         ray_info.rad = vec3(0);
