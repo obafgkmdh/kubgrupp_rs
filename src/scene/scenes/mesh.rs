@@ -672,8 +672,6 @@ impl MeshScene {
                         .try_into()
                         .unwrap();
 
-                    println!("{:?}", spectra);
-
                     let start_idx = lights.len();
 
                     // load triangles to get triangle lights
