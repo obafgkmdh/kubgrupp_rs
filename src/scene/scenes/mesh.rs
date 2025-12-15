@@ -1,5 +1,5 @@
 use std::{
-    alloc::{self, Layout}, collections::HashMap, f32::consts::PI, ffi::{CStr, CString}, fs::File, hash::Hash, io::{BufRead, BufReader, Read}, iter::{self, Peekable}, path::Path, ptr::NonNull
+    alloc::{self, Layout}, collections::HashMap, f32::consts::PI, ffi::{CStr, CString}, fs::File, io::{BufRead, BufReader, Read}, iter::{self, Peekable}, path::Path, ptr::NonNull
 };
 
 use anyhow::{anyhow, bail, Result};
