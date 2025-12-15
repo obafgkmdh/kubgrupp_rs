@@ -29,7 +29,7 @@ spectra = "d65"
 
 [[light]]
 type = "directional"
-color = [400, 400, 400]
+color = [1000, 1000, 1000]
 position = [-4, 0.045, 0.00]
 direction = [2, 0, 1.35]
 radius = 0.05
