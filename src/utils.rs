@@ -136,7 +136,9 @@ impl AllocatedBuffer {
     }
 
     pub fn mapped_ptr(&self) -> Option<*const u8> {
-        self.allocation.mapped_ptr().map(|p| p.as_ptr() as *const u8)
+        self.allocation
+            .mapped_ptr()
+            .map(|p| p.as_ptr() as *const u8)
     }
 
     pub unsafe fn destroy(self, device: &Device, allocator: &mut Allocator) {

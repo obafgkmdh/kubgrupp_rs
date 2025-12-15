@@ -1251,7 +1251,12 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
                 light_data.extend_from_slice(bytemuck::cast_slice(&color.to_array()));
                 light_data.extend_from_slice(bytemuck::cast_slice(&position.to_array()));
                 light_data.extend_from_slice(bytemuck::cast_slice(&[0f32; 10]));
-            } else if let Light::Triangle { color, vertices, emit_type } = light {
+            } else if let Light::Triangle {
+                color,
+                vertices,
+                emit_type,
+            } = light
+            {
                 light_data.extend_from_slice(bytemuck::cast_slice(&[1u32]));
                 light_data.extend_from_slice(bytemuck::cast_slice(&color.to_array()));
                 light_data.extend_from_slice(bytemuck::cast_slice(&[0f32, 0f32, 0f32]));
@@ -1627,7 +1632,8 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
         let pixel_data: &[f32] = unsafe {
             let ptr = staging_buffer
                 .mapped_ptr()
-                .ok_or_else(|| anyhow!("staging buffer not mapped"))? as *const f32;
+                .ok_or_else(|| anyhow!("staging buffer not mapped"))?
+                as *const f32;
             std::slice::from_raw_parts(ptr, width as usize * height as usize * 4)
         };
 
@@ -1654,9 +1660,8 @@ impl Renderer<MeshScene, WindowData> for RaytraceRenderer {
             img_data.push((a.clamp(0.0, 1.0) * 255.0) as u8);
         }
 
-        let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
-            ImageBuffer::from_raw(width, height, img_data)
-                .ok_or_else(|| anyhow!("failed to create image buffer"))?;
+        let img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_raw(width, height, img_data)
+            .ok_or_else(|| anyhow!("failed to create image buffer"))?;
 
         img.save(path)?;
 

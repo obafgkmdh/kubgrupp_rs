@@ -651,7 +651,7 @@ impl MeshScene {
 
                     let value = match light_conf.get("emit_type") {
                         Some(v) => v,
-                        _ => &Value::Integer(1)
+                        _ => &Value::Integer(1),
                     };
                     let emit_type = Self::parse_toml_f32(value)?;
 

@@ -362,11 +362,13 @@ where
                         .with_title("kubgrupp"),
                 )
                 .unwrap();
-            window
-                .set_cursor_grab(CursorGrabMode::Confined)
-                .or_else(|_e| window.set_cursor_grab(CursorGrabMode::Locked))
-                .expect("could not confine cursor");
-            window.set_cursor_visible(false);
+            if self.capture_frame.is_none() {
+                window
+                    .set_cursor_grab(CursorGrabMode::Confined)
+                    .or_else(|_e| window.set_cursor_grab(CursorGrabMode::Locked))
+                    .expect("could not confine cursor");
+                window.set_cursor_visible(false);
+            }
 
             let display_handle = window.display_handle().unwrap();
             let window_handle = window.window_handle().unwrap();
@@ -486,9 +488,11 @@ where
                 is_synthetic: _is_synthetic,
             } => {
                 if let PhysicalKey::Code(key_code) = input_event.physical_key {
-                    self.scene
-                        .camera
-                        .handle_key_input(key_code, input_event.state.is_pressed());
+                    if self.capture_frame.is_none() {
+                        self.scene
+                            .camera
+                            .handle_key_input(key_code, input_event.state.is_pressed());
+                    }
                 }
             }
             WindowEvent::Resized(PhysicalSize { width, height }) => {
@@ -503,7 +507,9 @@ where
                 }
                 self.prev_instant = Some(Instant::now());
 
-                self.scene.camera.handle_movement(dt);
+                if self.capture_frame.is_none() {
+                    self.scene.camera.handle_movement(dt);
+                }
 
                 let mut updates = Vec::new();
 
@@ -534,7 +540,10 @@ where
 
                 if let Some(target_frame) = self.capture_frame {
                     if self.frame_count >= target_frame {
-                        println!("Capturing frame {} to {}", self.frame_count, self.output_path);
+                        println!(
+                            "Capturing frame {} to {}",
+                            self.frame_count, self.output_path
+                        );
                         self.renderer
                             .as_mut()
                             .unwrap()
@@ -557,11 +566,13 @@ where
         _device_id: DeviceId,
         event: DeviceEvent,
     ) {
-        if let DeviceEvent::MouseMotion { delta: (dx, dy) } = event {
-            let (sx, sy) = self.window.as_ref().unwrap().get_size();
-            self.scene
-                .camera
-                .handle_mouse_input((dx / sx as f64) as f32, (dy / sy as f64) as f32);
+        if self.capture_frame.is_none() {
+            if let DeviceEvent::MouseMotion { delta: (dx, dy) } = event {
+                let (sx, sy) = self.window.as_ref().unwrap().get_size();
+                self.scene
+                    .camera
+                    .handle_mouse_input((dx / sx as f64) as f32, (dy / sy as f64) as f32);
+            }
         }
     }
 }

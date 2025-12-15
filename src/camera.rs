@@ -94,10 +94,7 @@ impl Camera {
         );
         key_movements.insert(
             KeyCode::Escape,
-            (
-                Direction::Escape,
-                Box::new(|_: &Vec3| panic!()),
-            ),
+            (Direction::Escape, Box::new(|_: &Vec3| panic!())),
         );
 
         let fov_radians = fov * PI / 180f32;
