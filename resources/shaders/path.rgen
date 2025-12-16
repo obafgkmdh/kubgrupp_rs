@@ -16,8 +16,8 @@
 
 layout(location = 0) rayPayloadEXT RayPayload ray_info;
 
-const uint MAX_DEPTH = 6;
-const uint SPP = 1;
+const uint MAX_DEPTH = 12;
+const uint SPP = 128;
 
 float power_heuristic(float a, float b) {
     float t = a * a;
@@ -105,7 +105,10 @@ void main() {
                 if (ray_info.emitter_type == 1.0) {
                     value += throughput * mis_weight * ray_info.rad.x;
                 }
-                if (ray_info.emitter_type == 0.0 && abs(dot(-ray_d, ray_info.hit_normal)) >= 0.996) {
+                if (ray_info.emitter_type == 0.0 && abs(dot(ray_d, ray_info.hit_normal)) >= 0.996) {
+                    value += throughput * mis_weight * ray_info.rad.x;
+                }
+                if (ray_info.emitter_type == 2.0 && dot(-ray_d, ray_info.hit_normal) >= 0.6) {
                     value += throughput * mis_weight * ray_info.rad.x;
                 }
                 break;

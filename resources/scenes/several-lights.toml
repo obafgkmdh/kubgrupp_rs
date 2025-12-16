@@ -1,0 +1,1868 @@
+[global_shaders]
+raygen = "path.rgen"
+miss = "black.rmiss"
+emitter_hit = "emitter.rchit"
+
+[camera]
+view = '''
+lookat 0 30 30   0 -5 0    0 0 1
+'''
+fov = 40
+
+[[brdf]]
+name = "diffuse"
+chit_shader = "diffuse.rchit"
+[[brdf.field]]
+name = "albedo"
+type = "vec3"
+
+[[brdf]]
+name = "dielectric"
+chit_shader = "dielectric.rchit"
+[[brdf.field]]
+name = "b"
+type = "vec3"
+[[brdf.field]]
+name = "c"
+type = "vec3"
+
+[[procedural_geometry]]
+name = "dvd"
+aabbs = [[-1, -1, -1, 1, 1, 1]]
+intersection_shader = "dvd.rint"
+closest_hit_shader = "dvd.rchit"
+
+[[object]]
+mesh = "cylinder.obj"
+transform = '''
+rotate 90 1 0 0
+scale 20 20 0.015
+'''
+brdf = {name = "diffuse", fields = [[0.1, 0.1, 0.1]]}
+
+
+[[light]]
+type = "area"
+color = [1, 1, 1]
+mesh = "circle.obj"
+transform = '''
+rotate -90 1 0 0
+translate 0 -0.5 0
+scale 1 1 1
+translate 0 0 8
+scale 0.5 0.5 0.5
+translate 0 -5 0
+'''
+spectra = "d65"
+emit_type = 2
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+scale 3.1 3.1 3.1
+rotate 47.5 0 0 1
+translate 1 -6.5 0
+scale 0.5 0.5 0.5
+translate 0 -5 0
+'''
+brdf = {name = "diffuse", fields = [[0.8, 0.8, 0.8]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+scale 3.6 3.6 3.6
+rotate 72 0 0 1
+translate -2.2 -1.8 0
+scale 0.5 0.5 0.5
+translate 0 -5 0
+'''
+brdf = {name = "diffuse", fields = [[0.001, 0.015, 0.011]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 64 0 0 1
+scale 1.3 1.3 1.3
+translate -2.2 0.2 3.6
+scale 0.5 0.5 0.5
+translate 0 -5 0
+'''
+brdf = {name = "diffuse", fields = [[0.01, 0.01, 0.01]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 45 1 -1 0
+scale 0.8 0.8 0.8
+translate 0 2 0
+scale 0.5 0.5 0.5
+translate 0 -5 0
+'''
+brdf = {name = "diffuse", fields = [[0.05, 0.05, 0.05]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 30 0 0 1
+scale 2.4 2.4 2.4
+translate 2.5 -1.5 0
+scale 0.5 0.5 0.5
+translate 0 -5 0
+'''
+brdf = {name = "diffuse", fields = [[0.226, 0.121, 0.054]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 90 0 0 1
+scale 1.3 1.3 1.3
+translate 6.8 -1.5 0
+scale 0.5 0.5 0.5
+translate 0 -5 0
+'''
+brdf = {name = "diffuse", fields = [[0.01, 0.01, 0.01]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 90 0 0 1
+scale 0.8 0.8 0.8
+translate 5 6 0
+scale 0.5 0.5 0.5
+translate 0 -5 0
+'''
+brdf = {name = "diffuse", fields = [[0.01, 0.01, 0.01]]}
+
+[[procedural_object]]
+geometry = "dvd"
+transform = '''
+translate 0 -1 0
+rotate 0 1 0 0
+translate 0 1 0
+scale 3 3 3
+translate -3.1 6 0.09
+scale 0.5 0.5 0.5
+translate 0 -5 0
+'''
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 1.0 7.0 0.1
+scale 0.5 0.5 0.5
+translate 0 -5 0
+'''
+brdf = {name = "diffuse", fields = [[0.4425531914893617, 0.4425531914893617, 0.4425531914893617]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 1.6389084080378344 6.518547981478362 0.1
+scale 0.5 0.5 0.5
+translate 0 -5 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.7659574468085106, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 2.277816816075669 6.037095962956723 0.1
+scale 0.5 0.5 0.5
+translate 0 -5 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.7659574468085106, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 2.916725224113503 5.555643944435084 0.1
+scale 0.5 0.5 0.5
+translate 0 -5 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.7659574468085106, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 3.5556336321513373 5.074191925913445 0.1
+scale 0.5 0.5 0.5
+translate 0 -5 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.7659574468085106, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 4.194542040189171 4.592739907391807 0.1
+scale 0.5 0.5 0.5
+translate 0 -5 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.06808510638297872, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 4.833450448227006 4.111287888870168 0.1
+scale 0.5 0.5 0.5
+translate 0 -5 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.06808510638297872, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 5.47235885626484 3.629835870348529 0.1
+scale 0.5 0.5 0.5
+translate 0 -5 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.06808510638297872, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 6.111267264302675 3.1483838518268907 0.1
+scale 0.5 0.5 0.5
+translate 0 -5 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.06808510638297872, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 6.750175672340509 2.6669318333052523 0.1
+scale 0.5 0.5 0.5
+translate 0 -5 0
+'''
+brdf = {name = "diffuse", fields = [[1.0, 1.0, 1.0]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 7.3890840803783435 2.185479814783614 0.1
+scale 0.5 0.5 0.5
+translate 0 -5 0
+'''
+brdf = {name = "diffuse", fields = [[0.30638297872340425, 0.06808510638297872, 0.502127659574468]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 8.027992488416178 1.7040277962619745 0.1
+scale 0.5 0.5 0.5
+translate 0 -5 0
+'''
+brdf = {name = "diffuse", fields = [[0.451063829787234, 0.22127659574468084, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 8.666900896454012 1.222575777740336 0.1
+scale 0.5 0.5 0.5
+translate 0 -5 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.2978723404255319, 0.451063829787234]]}
+
+
+[[light]]
+type = "area"
+color = [1, 1, 1]
+mesh = "circle.obj"
+transform = '''
+rotate -90 1 0 0
+translate 0 -0.5 0
+scale 1 1 1
+translate 0 0 8
+scale 0.5 0.5 0.5
+translate 10.0 -5.0 0
+'''
+spectra = "a"
+emit_type = 2
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+scale 3.1 3.1 3.1
+rotate 47.5 0 0 1
+translate 1 -6.5 0
+scale 0.5 0.5 0.5
+translate 10.0 -5.0 0
+'''
+brdf = {name = "diffuse", fields = [[0.8, 0.8, 0.8]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+scale 3.6 3.6 3.6
+rotate 72 0 0 1
+translate -2.2 -1.8 0
+scale 0.5 0.5 0.5
+translate 10.0 -5.0 0
+'''
+brdf = {name = "diffuse", fields = [[0.001, 0.015, 0.011]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 64 0 0 1
+scale 1.3 1.3 1.3
+translate -2.2 0.2 3.6
+scale 0.5 0.5 0.5
+translate 10.0 -5.0 0
+'''
+brdf = {name = "diffuse", fields = [[0.01, 0.01, 0.01]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 45 1 -1 0
+scale 0.8 0.8 0.8
+translate 0 2 0
+scale 0.5 0.5 0.5
+translate 10.0 -5.0 0
+'''
+brdf = {name = "diffuse", fields = [[0.05, 0.05, 0.05]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 30 0 0 1
+scale 2.4 2.4 2.4
+translate 2.5 -1.5 0
+scale 0.5 0.5 0.5
+translate 10.0 -5.0 0
+'''
+brdf = {name = "diffuse", fields = [[0.226, 0.121, 0.054]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 90 0 0 1
+scale 1.3 1.3 1.3
+translate 6.8 -1.5 0
+scale 0.5 0.5 0.5
+translate 10.0 -5.0 0
+'''
+brdf = {name = "diffuse", fields = [[0.01, 0.01, 0.01]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 90 0 0 1
+scale 0.8 0.8 0.8
+translate 5 6 0
+scale 0.5 0.5 0.5
+translate 10.0 -5.0 0
+'''
+brdf = {name = "diffuse", fields = [[0.01, 0.01, 0.01]]}
+
+[[procedural_object]]
+geometry = "dvd"
+transform = '''
+translate 0 -1 0
+rotate 0 1 0 0
+translate 0 1 0
+scale 3 3 3
+translate -3.1 6 0.09
+scale 0.5 0.5 0.5
+translate 10.0 -5.0 0
+'''
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 1.0 7.0 0.1
+scale 0.5 0.5 0.5
+translate 10.0 -5.0 0
+'''
+brdf = {name = "diffuse", fields = [[0.4425531914893617, 0.4425531914893617, 0.4425531914893617]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 1.6389084080378344 6.518547981478362 0.1
+scale 0.5 0.5 0.5
+translate 10.0 -5.0 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.7659574468085106, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 2.277816816075669 6.037095962956723 0.1
+scale 0.5 0.5 0.5
+translate 10.0 -5.0 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.7659574468085106, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 2.916725224113503 5.555643944435084 0.1
+scale 0.5 0.5 0.5
+translate 10.0 -5.0 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.7659574468085106, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 3.5556336321513373 5.074191925913445 0.1
+scale 0.5 0.5 0.5
+translate 10.0 -5.0 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.7659574468085106, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 4.194542040189171 4.592739907391807 0.1
+scale 0.5 0.5 0.5
+translate 10.0 -5.0 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.06808510638297872, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 4.833450448227006 4.111287888870168 0.1
+scale 0.5 0.5 0.5
+translate 10.0 -5.0 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.06808510638297872, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 5.47235885626484 3.629835870348529 0.1
+scale 0.5 0.5 0.5
+translate 10.0 -5.0 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.06808510638297872, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 6.111267264302675 3.1483838518268907 0.1
+scale 0.5 0.5 0.5
+translate 10.0 -5.0 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.06808510638297872, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 6.750175672340509 2.6669318333052523 0.1
+scale 0.5 0.5 0.5
+translate 10.0 -5.0 0
+'''
+brdf = {name = "diffuse", fields = [[1.0, 1.0, 1.0]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 7.3890840803783435 2.185479814783614 0.1
+scale 0.5 0.5 0.5
+translate 10.0 -5.0 0
+'''
+brdf = {name = "diffuse", fields = [[0.30638297872340425, 0.06808510638297872, 0.502127659574468]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 8.027992488416178 1.7040277962619745 0.1
+scale 0.5 0.5 0.5
+translate 10.0 -5.0 0
+'''
+brdf = {name = "diffuse", fields = [[0.451063829787234, 0.22127659574468084, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 8.666900896454012 1.222575777740336 0.1
+scale 0.5 0.5 0.5
+translate 10.0 -5.0 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.2978723404255319, 0.451063829787234]]}
+
+
+[[light]]
+type = "area"
+color = [1, 1, 1]
+mesh = "circle.obj"
+transform = '''
+rotate -90 1 0 0
+translate 0 -0.5 0
+scale 1 1 1
+translate 0 0 8
+scale 0.5 0.5 0.5
+translate 5.000000000000001 3.6602540378443855 0
+'''
+spectra = "fl4"
+emit_type = 2
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+scale 3.1 3.1 3.1
+rotate 47.5 0 0 1
+translate 1 -6.5 0
+scale 0.5 0.5 0.5
+translate 5.000000000000001 3.6602540378443855 0
+'''
+brdf = {name = "diffuse", fields = [[0.8, 0.8, 0.8]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+scale 3.6 3.6 3.6
+rotate 72 0 0 1
+translate -2.2 -1.8 0
+scale 0.5 0.5 0.5
+translate 5.000000000000001 3.6602540378443855 0
+'''
+brdf = {name = "diffuse", fields = [[0.001, 0.015, 0.011]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 64 0 0 1
+scale 1.3 1.3 1.3
+translate -2.2 0.2 3.6
+scale 0.5 0.5 0.5
+translate 5.000000000000001 3.6602540378443855 0
+'''
+brdf = {name = "diffuse", fields = [[0.01, 0.01, 0.01]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 45 1 -1 0
+scale 0.8 0.8 0.8
+translate 0 2 0
+scale 0.5 0.5 0.5
+translate 5.000000000000001 3.6602540378443855 0
+'''
+brdf = {name = "diffuse", fields = [[0.05, 0.05, 0.05]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 30 0 0 1
+scale 2.4 2.4 2.4
+translate 2.5 -1.5 0
+scale 0.5 0.5 0.5
+translate 5.000000000000001 3.6602540378443855 0
+'''
+brdf = {name = "diffuse", fields = [[0.226, 0.121, 0.054]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 90 0 0 1
+scale 1.3 1.3 1.3
+translate 6.8 -1.5 0
+scale 0.5 0.5 0.5
+translate 5.000000000000001 3.6602540378443855 0
+'''
+brdf = {name = "diffuse", fields = [[0.01, 0.01, 0.01]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 90 0 0 1
+scale 0.8 0.8 0.8
+translate 5 6 0
+scale 0.5 0.5 0.5
+translate 5.000000000000001 3.6602540378443855 0
+'''
+brdf = {name = "diffuse", fields = [[0.01, 0.01, 0.01]]}
+
+[[procedural_object]]
+geometry = "dvd"
+transform = '''
+translate 0 -1 0
+rotate 0 1 0 0
+translate 0 1 0
+scale 3 3 3
+translate -3.1 6 0.09
+scale 0.5 0.5 0.5
+translate 5.000000000000001 3.6602540378443855 0
+'''
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 1.0 7.0 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 3.6602540378443855 0
+'''
+brdf = {name = "diffuse", fields = [[0.4425531914893617, 0.4425531914893617, 0.4425531914893617]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 1.6389084080378344 6.518547981478362 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 3.6602540378443855 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.7659574468085106, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 2.277816816075669 6.037095962956723 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 3.6602540378443855 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.7659574468085106, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 2.916725224113503 5.555643944435084 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 3.6602540378443855 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.7659574468085106, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 3.5556336321513373 5.074191925913445 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 3.6602540378443855 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.7659574468085106, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 4.194542040189171 4.592739907391807 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 3.6602540378443855 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.06808510638297872, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 4.833450448227006 4.111287888870168 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 3.6602540378443855 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.06808510638297872, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 5.47235885626484 3.629835870348529 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 3.6602540378443855 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.06808510638297872, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 6.111267264302675 3.1483838518268907 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 3.6602540378443855 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.06808510638297872, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 6.750175672340509 2.6669318333052523 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 3.6602540378443855 0
+'''
+brdf = {name = "diffuse", fields = [[1.0, 1.0, 1.0]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 7.3890840803783435 2.185479814783614 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 3.6602540378443855 0
+'''
+brdf = {name = "diffuse", fields = [[0.30638297872340425, 0.06808510638297872, 0.502127659574468]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 8.027992488416178 1.7040277962619745 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 3.6602540378443855 0
+'''
+brdf = {name = "diffuse", fields = [[0.451063829787234, 0.22127659574468084, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 8.666900896454012 1.222575777740336 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 3.6602540378443855 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.2978723404255319, 0.451063829787234]]}
+
+
+[[light]]
+type = "area"
+color = [1, 1, 1]
+mesh = "circle.obj"
+transform = '''
+rotate -90 1 0 0
+translate 0 -0.5 0
+scale 1 1 1
+translate 0 0 8
+scale 0.5 0.5 0.5
+translate -4.999999999999998 3.6602540378443873 0
+'''
+spectra = "hp1"
+emit_type = 2
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+scale 3.1 3.1 3.1
+rotate 47.5 0 0 1
+translate 1 -6.5 0
+scale 0.5 0.5 0.5
+translate -4.999999999999998 3.6602540378443873 0
+'''
+brdf = {name = "diffuse", fields = [[0.8, 0.8, 0.8]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+scale 3.6 3.6 3.6
+rotate 72 0 0 1
+translate -2.2 -1.8 0
+scale 0.5 0.5 0.5
+translate -4.999999999999998 3.6602540378443873 0
+'''
+brdf = {name = "diffuse", fields = [[0.001, 0.015, 0.011]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 64 0 0 1
+scale 1.3 1.3 1.3
+translate -2.2 0.2 3.6
+scale 0.5 0.5 0.5
+translate -4.999999999999998 3.6602540378443873 0
+'''
+brdf = {name = "diffuse", fields = [[0.01, 0.01, 0.01]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 45 1 -1 0
+scale 0.8 0.8 0.8
+translate 0 2 0
+scale 0.5 0.5 0.5
+translate -4.999999999999998 3.6602540378443873 0
+'''
+brdf = {name = "diffuse", fields = [[0.05, 0.05, 0.05]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 30 0 0 1
+scale 2.4 2.4 2.4
+translate 2.5 -1.5 0
+scale 0.5 0.5 0.5
+translate -4.999999999999998 3.6602540378443873 0
+'''
+brdf = {name = "diffuse", fields = [[0.226, 0.121, 0.054]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 90 0 0 1
+scale 1.3 1.3 1.3
+translate 6.8 -1.5 0
+scale 0.5 0.5 0.5
+translate -4.999999999999998 3.6602540378443873 0
+'''
+brdf = {name = "diffuse", fields = [[0.01, 0.01, 0.01]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 90 0 0 1
+scale 0.8 0.8 0.8
+translate 5 6 0
+scale 0.5 0.5 0.5
+translate -4.999999999999998 3.6602540378443873 0
+'''
+brdf = {name = "diffuse", fields = [[0.01, 0.01, 0.01]]}
+
+[[procedural_object]]
+geometry = "dvd"
+transform = '''
+translate 0 -1 0
+rotate 0 1 0 0
+translate 0 1 0
+scale 3 3 3
+translate -3.1 6 0.09
+scale 0.5 0.5 0.5
+translate -4.999999999999998 3.6602540378443873 0
+'''
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 1.0 7.0 0.1
+scale 0.5 0.5 0.5
+translate -4.999999999999998 3.6602540378443873 0
+'''
+brdf = {name = "diffuse", fields = [[0.4425531914893617, 0.4425531914893617, 0.4425531914893617]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 1.6389084080378344 6.518547981478362 0.1
+scale 0.5 0.5 0.5
+translate -4.999999999999998 3.6602540378443873 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.7659574468085106, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 2.277816816075669 6.037095962956723 0.1
+scale 0.5 0.5 0.5
+translate -4.999999999999998 3.6602540378443873 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.7659574468085106, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 2.916725224113503 5.555643944435084 0.1
+scale 0.5 0.5 0.5
+translate -4.999999999999998 3.6602540378443873 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.7659574468085106, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 3.5556336321513373 5.074191925913445 0.1
+scale 0.5 0.5 0.5
+translate -4.999999999999998 3.6602540378443873 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.7659574468085106, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 4.194542040189171 4.592739907391807 0.1
+scale 0.5 0.5 0.5
+translate -4.999999999999998 3.6602540378443873 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.06808510638297872, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 4.833450448227006 4.111287888870168 0.1
+scale 0.5 0.5 0.5
+translate -4.999999999999998 3.6602540378443873 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.06808510638297872, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 5.47235885626484 3.629835870348529 0.1
+scale 0.5 0.5 0.5
+translate -4.999999999999998 3.6602540378443873 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.06808510638297872, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 6.111267264302675 3.1483838518268907 0.1
+scale 0.5 0.5 0.5
+translate -4.999999999999998 3.6602540378443873 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.06808510638297872, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 6.750175672340509 2.6669318333052523 0.1
+scale 0.5 0.5 0.5
+translate -4.999999999999998 3.6602540378443873 0
+'''
+brdf = {name = "diffuse", fields = [[1.0, 1.0, 1.0]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 7.3890840803783435 2.185479814783614 0.1
+scale 0.5 0.5 0.5
+translate -4.999999999999998 3.6602540378443873 0
+'''
+brdf = {name = "diffuse", fields = [[0.30638297872340425, 0.06808510638297872, 0.502127659574468]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 8.027992488416178 1.7040277962619745 0.1
+scale 0.5 0.5 0.5
+translate -4.999999999999998 3.6602540378443873 0
+'''
+brdf = {name = "diffuse", fields = [[0.451063829787234, 0.22127659574468084, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 8.666900896454012 1.222575777740336 0.1
+scale 0.5 0.5 0.5
+translate -4.999999999999998 3.6602540378443873 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.2978723404255319, 0.451063829787234]]}
+
+
+[[light]]
+type = "area"
+color = [1, 1, 1]
+mesh = "circle.obj"
+transform = '''
+rotate -90 1 0 0
+translate 0 -0.5 0
+scale 1 1 1
+translate 0 0 8
+scale 0.5 0.5 0.5
+translate -10.0 -4.999999999999999 0
+'''
+spectra = "rgb_combined"
+emit_type = 2
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+scale 3.1 3.1 3.1
+rotate 47.5 0 0 1
+translate 1 -6.5 0
+scale 0.5 0.5 0.5
+translate -10.0 -4.999999999999999 0
+'''
+brdf = {name = "diffuse", fields = [[0.8, 0.8, 0.8]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+scale 3.6 3.6 3.6
+rotate 72 0 0 1
+translate -2.2 -1.8 0
+scale 0.5 0.5 0.5
+translate -10.0 -4.999999999999999 0
+'''
+brdf = {name = "diffuse", fields = [[0.001, 0.015, 0.011]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 64 0 0 1
+scale 1.3 1.3 1.3
+translate -2.2 0.2 3.6
+scale 0.5 0.5 0.5
+translate -10.0 -4.999999999999999 0
+'''
+brdf = {name = "diffuse", fields = [[0.01, 0.01, 0.01]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 45 1 -1 0
+scale 0.8 0.8 0.8
+translate 0 2 0
+scale 0.5 0.5 0.5
+translate -10.0 -4.999999999999999 0
+'''
+brdf = {name = "diffuse", fields = [[0.05, 0.05, 0.05]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 30 0 0 1
+scale 2.4 2.4 2.4
+translate 2.5 -1.5 0
+scale 0.5 0.5 0.5
+translate -10.0 -4.999999999999999 0
+'''
+brdf = {name = "diffuse", fields = [[0.226, 0.121, 0.054]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 90 0 0 1
+scale 1.3 1.3 1.3
+translate 6.8 -1.5 0
+scale 0.5 0.5 0.5
+translate -10.0 -4.999999999999999 0
+'''
+brdf = {name = "diffuse", fields = [[0.01, 0.01, 0.01]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 90 0 0 1
+scale 0.8 0.8 0.8
+translate 5 6 0
+scale 0.5 0.5 0.5
+translate -10.0 -4.999999999999999 0
+'''
+brdf = {name = "diffuse", fields = [[0.01, 0.01, 0.01]]}
+
+[[procedural_object]]
+geometry = "dvd"
+transform = '''
+translate 0 -1 0
+rotate 0 1 0 0
+translate 0 1 0
+scale 3 3 3
+translate -3.1 6 0.09
+scale 0.5 0.5 0.5
+translate -10.0 -4.999999999999999 0
+'''
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 1.0 7.0 0.1
+scale 0.5 0.5 0.5
+translate -10.0 -4.999999999999999 0
+'''
+brdf = {name = "diffuse", fields = [[0.4425531914893617, 0.4425531914893617, 0.4425531914893617]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 1.6389084080378344 6.518547981478362 0.1
+scale 0.5 0.5 0.5
+translate -10.0 -4.999999999999999 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.7659574468085106, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 2.277816816075669 6.037095962956723 0.1
+scale 0.5 0.5 0.5
+translate -10.0 -4.999999999999999 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.7659574468085106, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 2.916725224113503 5.555643944435084 0.1
+scale 0.5 0.5 0.5
+translate -10.0 -4.999999999999999 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.7659574468085106, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 3.5556336321513373 5.074191925913445 0.1
+scale 0.5 0.5 0.5
+translate -10.0 -4.999999999999999 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.7659574468085106, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 4.194542040189171 4.592739907391807 0.1
+scale 0.5 0.5 0.5
+translate -10.0 -4.999999999999999 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.06808510638297872, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 4.833450448227006 4.111287888870168 0.1
+scale 0.5 0.5 0.5
+translate -10.0 -4.999999999999999 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.06808510638297872, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 5.47235885626484 3.629835870348529 0.1
+scale 0.5 0.5 0.5
+translate -10.0 -4.999999999999999 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.06808510638297872, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 6.111267264302675 3.1483838518268907 0.1
+scale 0.5 0.5 0.5
+translate -10.0 -4.999999999999999 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.06808510638297872, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 6.750175672340509 2.6669318333052523 0.1
+scale 0.5 0.5 0.5
+translate -10.0 -4.999999999999999 0
+'''
+brdf = {name = "diffuse", fields = [[1.0, 1.0, 1.0]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 7.3890840803783435 2.185479814783614 0.1
+scale 0.5 0.5 0.5
+translate -10.0 -4.999999999999999 0
+'''
+brdf = {name = "diffuse", fields = [[0.30638297872340425, 0.06808510638297872, 0.502127659574468]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 8.027992488416178 1.7040277962619745 0.1
+scale 0.5 0.5 0.5
+translate -10.0 -4.999999999999999 0
+'''
+brdf = {name = "diffuse", fields = [[0.451063829787234, 0.22127659574468084, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 8.666900896454012 1.222575777740336 0.1
+scale 0.5 0.5 0.5
+translate -10.0 -4.999999999999999 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.2978723404255319, 0.451063829787234]]}
+
+
+[[light]]
+type = "area"
+color = [1, 1, 1]
+mesh = "circle.obj"
+transform = '''
+rotate -90 1 0 0
+translate 0 -0.5 0
+scale 1 1 1
+translate 0 0 8
+scale 0.5 0.5 0.5
+translate -5.000000000000004 -13.660254037844384 0
+'''
+spectra = "2469_2700k"
+emit_type = 2
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+scale 3.1 3.1 3.1
+rotate 47.5 0 0 1
+translate 1 -6.5 0
+scale 0.5 0.5 0.5
+translate -5.000000000000004 -13.660254037844384 0
+'''
+brdf = {name = "diffuse", fields = [[0.8, 0.8, 0.8]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+scale 3.6 3.6 3.6
+rotate 72 0 0 1
+translate -2.2 -1.8 0
+scale 0.5 0.5 0.5
+translate -5.000000000000004 -13.660254037844384 0
+'''
+brdf = {name = "diffuse", fields = [[0.001, 0.015, 0.011]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 64 0 0 1
+scale 1.3 1.3 1.3
+translate -2.2 0.2 3.6
+scale 0.5 0.5 0.5
+translate -5.000000000000004 -13.660254037844384 0
+'''
+brdf = {name = "diffuse", fields = [[0.01, 0.01, 0.01]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 45 1 -1 0
+scale 0.8 0.8 0.8
+translate 0 2 0
+scale 0.5 0.5 0.5
+translate -5.000000000000004 -13.660254037844384 0
+'''
+brdf = {name = "diffuse", fields = [[0.05, 0.05, 0.05]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 30 0 0 1
+scale 2.4 2.4 2.4
+translate 2.5 -1.5 0
+scale 0.5 0.5 0.5
+translate -5.000000000000004 -13.660254037844384 0
+'''
+brdf = {name = "diffuse", fields = [[0.226, 0.121, 0.054]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 90 0 0 1
+scale 1.3 1.3 1.3
+translate 6.8 -1.5 0
+scale 0.5 0.5 0.5
+translate -5.000000000000004 -13.660254037844384 0
+'''
+brdf = {name = "diffuse", fields = [[0.01, 0.01, 0.01]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 90 0 0 1
+scale 0.8 0.8 0.8
+translate 5 6 0
+scale 0.5 0.5 0.5
+translate -5.000000000000004 -13.660254037844384 0
+'''
+brdf = {name = "diffuse", fields = [[0.01, 0.01, 0.01]]}
+
+[[procedural_object]]
+geometry = "dvd"
+transform = '''
+translate 0 -1 0
+rotate 0 1 0 0
+translate 0 1 0
+scale 3 3 3
+translate -3.1 6 0.09
+scale 0.5 0.5 0.5
+translate -5.000000000000004 -13.660254037844384 0
+'''
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 1.0 7.0 0.1
+scale 0.5 0.5 0.5
+translate -5.000000000000004 -13.660254037844384 0
+'''
+brdf = {name = "diffuse", fields = [[0.4425531914893617, 0.4425531914893617, 0.4425531914893617]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 1.6389084080378344 6.518547981478362 0.1
+scale 0.5 0.5 0.5
+translate -5.000000000000004 -13.660254037844384 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.7659574468085106, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 2.277816816075669 6.037095962956723 0.1
+scale 0.5 0.5 0.5
+translate -5.000000000000004 -13.660254037844384 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.7659574468085106, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 2.916725224113503 5.555643944435084 0.1
+scale 0.5 0.5 0.5
+translate -5.000000000000004 -13.660254037844384 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.7659574468085106, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 3.5556336321513373 5.074191925913445 0.1
+scale 0.5 0.5 0.5
+translate -5.000000000000004 -13.660254037844384 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.7659574468085106, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 4.194542040189171 4.592739907391807 0.1
+scale 0.5 0.5 0.5
+translate -5.000000000000004 -13.660254037844384 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.06808510638297872, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 4.833450448227006 4.111287888870168 0.1
+scale 0.5 0.5 0.5
+translate -5.000000000000004 -13.660254037844384 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.06808510638297872, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 5.47235885626484 3.629835870348529 0.1
+scale 0.5 0.5 0.5
+translate -5.000000000000004 -13.660254037844384 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.06808510638297872, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 6.111267264302675 3.1483838518268907 0.1
+scale 0.5 0.5 0.5
+translate -5.000000000000004 -13.660254037844384 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.06808510638297872, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 6.750175672340509 2.6669318333052523 0.1
+scale 0.5 0.5 0.5
+translate -5.000000000000004 -13.660254037844384 0
+'''
+brdf = {name = "diffuse", fields = [[1.0, 1.0, 1.0]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 7.3890840803783435 2.185479814783614 0.1
+scale 0.5 0.5 0.5
+translate -5.000000000000004 -13.660254037844384 0
+'''
+brdf = {name = "diffuse", fields = [[0.30638297872340425, 0.06808510638297872, 0.502127659574468]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 8.027992488416178 1.7040277962619745 0.1
+scale 0.5 0.5 0.5
+translate -5.000000000000004 -13.660254037844384 0
+'''
+brdf = {name = "diffuse", fields = [[0.451063829787234, 0.22127659574468084, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 8.666900896454012 1.222575777740336 0.1
+scale 0.5 0.5 0.5
+translate -5.000000000000004 -13.660254037844384 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.2978723404255319, 0.451063829787234]]}
+
+
+[[light]]
+type = "area"
+color = [1, 1, 1]
+mesh = "circle.obj"
+transform = '''
+rotate -90 1 0 0
+translate 0 -0.5 0
+scale 1 1 1
+translate 0 0 8
+scale 0.5 0.5 0.5
+translate 5.000000000000001 -13.660254037844386 0
+'''
+spectra = "2619_7500k"
+emit_type = 2
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+scale 3.1 3.1 3.1
+rotate 47.5 0 0 1
+translate 1 -6.5 0
+scale 0.5 0.5 0.5
+translate 5.000000000000001 -13.660254037844386 0
+'''
+brdf = {name = "diffuse", fields = [[0.8, 0.8, 0.8]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+scale 3.6 3.6 3.6
+rotate 72 0 0 1
+translate -2.2 -1.8 0
+scale 0.5 0.5 0.5
+translate 5.000000000000001 -13.660254037844386 0
+'''
+brdf = {name = "diffuse", fields = [[0.001, 0.015, 0.011]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 64 0 0 1
+scale 1.3 1.3 1.3
+translate -2.2 0.2 3.6
+scale 0.5 0.5 0.5
+translate 5.000000000000001 -13.660254037844386 0
+'''
+brdf = {name = "diffuse", fields = [[0.01, 0.01, 0.01]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 45 1 -1 0
+scale 0.8 0.8 0.8
+translate 0 2 0
+scale 0.5 0.5 0.5
+translate 5.000000000000001 -13.660254037844386 0
+'''
+brdf = {name = "diffuse", fields = [[0.05, 0.05, 0.05]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 30 0 0 1
+scale 2.4 2.4 2.4
+translate 2.5 -1.5 0
+scale 0.5 0.5 0.5
+translate 5.000000000000001 -13.660254037844386 0
+'''
+brdf = {name = "diffuse", fields = [[0.226, 0.121, 0.054]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 90 0 0 1
+scale 1.3 1.3 1.3
+translate 6.8 -1.5 0
+scale 0.5 0.5 0.5
+translate 5.000000000000001 -13.660254037844386 0
+'''
+brdf = {name = "diffuse", fields = [[0.01, 0.01, 0.01]]}
+
+[[object]]
+mesh = "cube.obj"
+transform = '''
+rotate 90 0 0 1
+scale 0.8 0.8 0.8
+translate 5 6 0
+scale 0.5 0.5 0.5
+translate 5.000000000000001 -13.660254037844386 0
+'''
+brdf = {name = "diffuse", fields = [[0.01, 0.01, 0.01]]}
+
+[[procedural_object]]
+geometry = "dvd"
+transform = '''
+translate 0 -1 0
+rotate 0 1 0 0
+translate 0 1 0
+scale 3 3 3
+translate -3.1 6 0.09
+scale 0.5 0.5 0.5
+translate 5.000000000000001 -13.660254037844386 0
+'''
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 1.0 7.0 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 -13.660254037844386 0
+'''
+brdf = {name = "diffuse", fields = [[0.4425531914893617, 0.4425531914893617, 0.4425531914893617]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 1.6389084080378344 6.518547981478362 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 -13.660254037844386 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.7659574468085106, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 2.277816816075669 6.037095962956723 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 -13.660254037844386 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.7659574468085106, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 2.916725224113503 5.555643944435084 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 -13.660254037844386 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.7659574468085106, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 3.5556336321513373 5.074191925913445 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 -13.660254037844386 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.7659574468085106, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 4.194542040189171 4.592739907391807 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 -13.660254037844386 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.06808510638297872, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 4.833450448227006 4.111287888870168 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 -13.660254037844386 0
+'''
+brdf = {name = "diffuse", fields = [[0.7659574468085106, 0.06808510638297872, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 5.47235885626484 3.629835870348529 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 -13.660254037844386 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.06808510638297872, 0.7659574468085106]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 6.111267264302675 3.1483838518268907 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 -13.660254037844386 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.06808510638297872, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 6.750175672340509 2.6669318333052523 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 -13.660254037844386 0
+'''
+brdf = {name = "diffuse", fields = [[1.0, 1.0, 1.0]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 7.3890840803783435 2.185479814783614 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 -13.660254037844386 0
+'''
+brdf = {name = "diffuse", fields = [[0.30638297872340425, 0.06808510638297872, 0.502127659574468]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 8.027992488416178 1.7040277962619745 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 -13.660254037844386 0
+'''
+brdf = {name = "diffuse", fields = [[0.451063829787234, 0.22127659574468084, 0.06808510638297872]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+scale 2 0.8 1
+rotate 53 0 0 1
+translate 8.666900896454012 1.222575777740336 0.1
+scale 0.5 0.5 0.5
+translate 5.000000000000001 -13.660254037844386 0
+'''
+brdf = {name = "diffuse", fields = [[0.06808510638297872, 0.2978723404255319, 0.451063829787234]]}

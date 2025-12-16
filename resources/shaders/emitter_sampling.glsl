@@ -50,6 +50,8 @@ EmitterSample sample_light(vec3 hit_pos, inout uint seed, inout float wavelength
             visible = true;
         } else if (light.emit_type == 1.0 && cos_angle_to_light >= 0.0) {
             visible = true;
+        } else if (light.emit_type == 2.0 && cos_angle_to_light >= 0.6) {
+            visible = true;
         }
 
         float wavelength_u = (wavelength - minWavelength) / rangeWavelengths;
