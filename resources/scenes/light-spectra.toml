@@ -1,0 +1,517 @@
+[global_shaders]
+raygen = "path.rgen"
+miss = "black.rmiss"
+emitter_hit = "emitter.rchit"
+
+[camera]
+view = '''
+lookat -300 0 800   0 0 25    0 0 1
+'''
+fov = 5
+
+[[brdf]]
+name = "diffuse"
+chit_shader = "diffuse.rchit"
+[[brdf.field]]
+name = "albedo"
+type = "vec3"
+
+[[brdf]]
+name = "dielectric"
+chit_shader = "dielectric.rchit"
+[[brdf.field]]
+name = "b"
+type = "vec3"
+[[brdf.field]]
+name = "c"
+type = "vec3"
+
+[[procedural_geometry]]
+name = "dvd"
+aabbs = [[-1, -1, -1, 1, 1, 1]]
+intersection_shader = "dvd.rint"
+closest_hit_shader = "dvd.rchit"
+
+[[object]]
+mesh = "cylinder.obj"
+transform = '''
+rotate 90 1 0 0
+scale 20 20 0.015
+'''
+brdf = {name = "diffuse", fields = [[0.1, 0.1, 0.1]]}
+
+[[brdf]]
+name = "diffraction_grating"
+chit_shader = "diffraction_grating.rchit"
+[[brdf.field]]
+name = "period"
+type = "float"
+[[brdf.field]]
+name = "height"
+type = "float"
+[[brdf.field]]
+name = "towards"
+type = "vec3"
+
+
+[[light]]
+type = "area"
+color = [10, 1, 1]
+mesh = "circle.obj"
+transform = '''
+rotate -90 1 0 0
+translate 0 -0.5 0
+scale 0.2 0.2 1
+translate 0 0 5
+scale 1.8 1.8 1.8
+translate 0 -30 0
+'''
+spectra = "d65"
+emit_type = 0
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+rotate 45 0 1 0
+scale 2 2 2
+translate 0 0 0.8
+scale 1.8 1.8 1.8
+translate 0 -30 0
+'''
+brdf = {name = "diffraction_grating", fields = [740, 110, [1, 0, 0]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -.5 -.5 0
+scale 2 2 2
+rotate -90 0 1 0
+scale 1 6 50
+translate 2 0 1
+rotate 20 0 1 0
+scale 1.8 1.8 1.8
+translate 0 -30 0
+'''
+brdf = {name = "diffuse", fields = [[1, 1, 1]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -.5 -.5 0
+scale 2 2 2
+rotate -90 1 0 0
+scale 50 1 50
+translate 45 2 1
+scale 1.8 1.8 1.8
+translate 0 -30 0
+'''
+brdf = {name = "diffuse", fields = [[0, 0, 0]]}
+
+[[object]]
+mesh = "slit.obj"
+transform = '''
+rotate 90 1 0 0
+scale 0.5 0.5 0.5
+translate 0 0 3
+scale 1.8 1.8 1.8
+translate 0 -30 0
+'''
+brdf = {name = "diffuse", fields = [[0.005, 0.005, 0.005]]}
+
+
+[[light]]
+type = "area"
+color = [10, 1, 1]
+mesh = "circle.obj"
+transform = '''
+rotate -90 1 0 0
+translate 0 -0.5 0
+scale 0.2 0.2 1
+translate 0 0 5
+scale 1.8 1.8 1.8
+translate 0 -20 0
+'''
+spectra = "hp1"
+emit_type = 0
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+rotate 45 0 1 0
+scale 2 2 2
+translate 0 0 0.8
+scale 1.8 1.8 1.8
+translate 0 -20 0
+'''
+brdf = {name = "diffraction_grating", fields = [740, 110, [1, 0, 0]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -.5 -.5 0
+scale 2 2 2
+rotate -90 0 1 0
+scale 1 6 50
+translate 2 0 1
+rotate 20 0 1 0
+scale 1.8 1.8 1.8
+translate 0 -20 0
+'''
+brdf = {name = "diffuse", fields = [[1, 1, 1]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -.5 -.5 0
+scale 2 2 2
+rotate -90 1 0 0
+scale 50 1 50
+translate 45 2 1
+scale 1.8 1.8 1.8
+translate 0 -20 0
+'''
+brdf = {name = "diffuse", fields = [[0, 0, 0]]}
+
+[[object]]
+mesh = "slit.obj"
+transform = '''
+rotate 90 1 0 0
+scale 0.5 0.5 0.5
+translate 0 0 3
+scale 1.8 1.8 1.8
+translate 0 -20 0
+'''
+brdf = {name = "diffuse", fields = [[0.005, 0.005, 0.005]]}
+
+
+[[light]]
+type = "area"
+color = [10, 1, 1]
+mesh = "circle.obj"
+transform = '''
+rotate -90 1 0 0
+translate 0 -0.5 0
+scale 0.2 0.2 1
+translate 0 0 5
+scale 1.8 1.8 1.8
+translate 0 -10 0
+'''
+spectra = "element_h"
+emit_type = 0
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+rotate 45 0 1 0
+scale 2 2 2
+translate 0 0 0.8
+scale 1.8 1.8 1.8
+translate 0 -10 0
+'''
+brdf = {name = "diffraction_grating", fields = [740, 110, [1, 0, 0]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -.5 -.5 0
+scale 2 2 2
+rotate -90 0 1 0
+scale 1 6 50
+translate 2 0 1
+rotate 20 0 1 0
+scale 1.8 1.8 1.8
+translate 0 -10 0
+'''
+brdf = {name = "diffuse", fields = [[1, 1, 1]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -.5 -.5 0
+scale 2 2 2
+rotate -90 1 0 0
+scale 50 1 50
+translate 45 2 1
+scale 1.8 1.8 1.8
+translate 0 -10 0
+'''
+brdf = {name = "diffuse", fields = [[0, 0, 0]]}
+
+[[object]]
+mesh = "slit.obj"
+transform = '''
+rotate 90 1 0 0
+scale 0.5 0.5 0.5
+translate 0 0 3
+scale 1.8 1.8 1.8
+translate 0 -10 0
+'''
+brdf = {name = "diffuse", fields = [[0.005, 0.005, 0.005]]}
+
+
+[[light]]
+type = "area"
+color = [10, 1, 1]
+mesh = "circle.obj"
+transform = '''
+rotate -90 1 0 0
+translate 0 -0.5 0
+scale 0.2 0.2 1
+translate 0 0 5
+scale 1.8 1.8 1.8
+translate 0 0 0
+'''
+spectra = "element_he"
+emit_type = 0
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+rotate 45 0 1 0
+scale 2 2 2
+translate 0 0 0.8
+scale 1.8 1.8 1.8
+translate 0 0 0
+'''
+brdf = {name = "diffraction_grating", fields = [740, 110, [1, 0, 0]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -.5 -.5 0
+scale 2 2 2
+rotate -90 0 1 0
+scale 1 6 50
+translate 2 0 1
+rotate 20 0 1 0
+scale 1.8 1.8 1.8
+translate 0 0 0
+'''
+brdf = {name = "diffuse", fields = [[1, 1, 1]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -.5 -.5 0
+scale 2 2 2
+rotate -90 1 0 0
+scale 50 1 50
+translate 45 2 1
+scale 1.8 1.8 1.8
+translate 0 0 0
+'''
+brdf = {name = "diffuse", fields = [[0, 0, 0]]}
+
+[[object]]
+mesh = "slit.obj"
+transform = '''
+rotate 90 1 0 0
+scale 0.5 0.5 0.5
+translate 0 0 3
+scale 1.8 1.8 1.8
+translate 0 0 0
+'''
+brdf = {name = "diffuse", fields = [[0.005, 0.005, 0.005]]}
+
+
+[[light]]
+type = "area"
+color = [10, 1, 1]
+mesh = "circle.obj"
+transform = '''
+rotate -90 1 0 0
+translate 0 -0.5 0
+scale 0.2 0.2 1
+translate 0 0 5
+scale 1.8 1.8 1.8
+translate 0 10 0
+'''
+spectra = "element_ne"
+emit_type = 0
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+rotate 45 0 1 0
+scale 2 2 2
+translate 0 0 0.8
+scale 1.8 1.8 1.8
+translate 0 10 0
+'''
+brdf = {name = "diffraction_grating", fields = [740, 110, [1, 0, 0]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -.5 -.5 0
+scale 2 2 2
+rotate -90 0 1 0
+scale 1 6 50
+translate 2 0 1
+rotate 20 0 1 0
+scale 1.8 1.8 1.8
+translate 0 10 0
+'''
+brdf = {name = "diffuse", fields = [[1, 1, 1]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -.5 -.5 0
+scale 2 2 2
+rotate -90 1 0 0
+scale 50 1 50
+translate 45 2 1
+scale 1.8 1.8 1.8
+translate 0 10 0
+'''
+brdf = {name = "diffuse", fields = [[0, 0, 0]]}
+
+[[object]]
+mesh = "slit.obj"
+transform = '''
+rotate 90 1 0 0
+scale 0.5 0.5 0.5
+translate 0 0 3
+scale 1.8 1.8 1.8
+translate 0 10 0
+'''
+brdf = {name = "diffuse", fields = [[0.005, 0.005, 0.005]]}
+
+
+[[light]]
+type = "area"
+color = [10, 1, 1]
+mesh = "circle.obj"
+transform = '''
+rotate -90 1 0 0
+translate 0 -0.5 0
+scale 0.2 0.2 1
+translate 0 0 5
+scale 1.8 1.8 1.8
+translate 0 20 0
+'''
+spectra = "element_ar"
+emit_type = 0
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+rotate 45 0 1 0
+scale 2 2 2
+translate 0 0 0.8
+scale 1.8 1.8 1.8
+translate 0 20 0
+'''
+brdf = {name = "diffraction_grating", fields = [740, 110, [1, 0, 0]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -.5 -.5 0
+scale 2 2 2
+rotate -90 0 1 0
+scale 1 6 50
+translate 2 0 1
+rotate 20 0 1 0
+scale 1.8 1.8 1.8
+translate 0 20 0
+'''
+brdf = {name = "diffuse", fields = [[1, 1, 1]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -.5 -.5 0
+scale 2 2 2
+rotate -90 1 0 0
+scale 50 1 50
+translate 45 2 1
+scale 1.8 1.8 1.8
+translate 0 20 0
+'''
+brdf = {name = "diffuse", fields = [[0, 0, 0]]}
+
+[[object]]
+mesh = "slit.obj"
+transform = '''
+rotate 90 1 0 0
+scale 0.5 0.5 0.5
+translate 0 0 3
+scale 1.8 1.8 1.8
+translate 0 20 0
+'''
+brdf = {name = "diffuse", fields = [[0.005, 0.005, 0.005]]}
+
+
+[[light]]
+type = "area"
+color = [10, 1, 1]
+mesh = "circle.obj"
+transform = '''
+rotate -90 1 0 0
+translate 0 -0.5 0
+scale 0.2 0.2 1
+translate 0 0 5
+scale 1.8 1.8 1.8
+translate 0 30 0
+'''
+spectra = "element_fe"
+emit_type = 0
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -0.5 -0.5 0
+rotate 45 0 1 0
+scale 2 2 2
+translate 0 0 0.8
+scale 1.8 1.8 1.8
+translate 0 30 0
+'''
+brdf = {name = "diffraction_grating", fields = [740, 110, [1, 0, 0]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -.5 -.5 0
+scale 2 2 2
+rotate -90 0 1 0
+scale 1 6 50
+translate 2 0 1
+rotate 20 0 1 0
+scale 1.8 1.8 1.8
+translate 0 30 0
+'''
+brdf = {name = "diffuse", fields = [[1, 1, 1]]}
+
+[[object]]
+mesh = "square.obj"
+transform = '''
+translate -.5 -.5 0
+scale 2 2 2
+rotate -90 1 0 0
+scale 50 1 50
+translate 45 2 1
+scale 1.8 1.8 1.8
+translate 0 30 0
+'''
+brdf = {name = "diffuse", fields = [[0, 0, 0]]}
+
+[[object]]
+mesh = "slit.obj"
+transform = '''
+rotate 90 1 0 0
+scale 0.5 0.5 0.5
+translate 0 0 3
+scale 1.8 1.8 1.8
+translate 0 30 0
+'''
+brdf = {name = "diffuse", fields = [[0.005, 0.005, 0.005]]}
+
